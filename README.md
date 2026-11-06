@@ -1181,9 +1181,9 @@ B.Tech – Computer Science and Engineering
 
 IIIT Nagpur
 
-GitHub: [YOUR_GITHUB_PROFILE](https://github.com/YOUR_USERNAME)
+GitHub: [YOUR_GITHUB_PROFILE](https://github.com/rohi5431)
 
-LinkedIn: [YOUR_LINKEDIN_PROFILE](https://www.linkedin.com/)
+LinkedIn: [YOUR_LINKEDIN_PROFILE](https://www.linkedin.com/in/rohit-kumar-3707382a2/)
 
 ---
 
