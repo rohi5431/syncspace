@@ -1,17 +1,17 @@
 # Template for the NestJS API, realtime gateway, or worker.
 # Build from the service directory with SERVICE_NAME set to the package output.
-FROM node:22-alpine AS deps
+FROM node:25-alpine AS deps
 RUN corepack enable
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
-FROM node:22-alpine AS build
+FROM node:25-alpine AS build
 RUN corepack enable
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build
-FROM node:22-alpine AS runtime
+FROM node:25-alpine AS runtime
 RUN addgroup -S app && adduser -S app -G app
 WORKDIR /app
 ENV NODE_ENV=production
