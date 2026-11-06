@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
+import { ApiError } from '@/lib/api-client'
 import type { DocumentItem, ProjectItem } from '@/lib/demo-data'
 
 export function CreateDocumentDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (document: DocumentItem) => void }) {
@@ -39,23 +40,31 @@ export function CreateProjectDialog({ open, onClose, onCreate }: { open: boolean
   </Modal>
 }
 
-export function CreateWorkspaceDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (name: string) => void }) {
+export function CreateWorkspaceDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (name: string) => Promise<void> }) {
   const [name, setName] = useState('')
   const [error, setError] = useState('')
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const value = name.trim()
-    if (!value) {
-      setError('Enter a workspace name to continue.')
+    if (value.length < 2) {
+      setError('Workspace names must be at least 2 characters.')
       return
     }
-    onCreate(value)
-    setName('')
     setError('')
-    onClose()
+    setIsSubmitting(true)
+    try {
+      await onCreate(value)
+      setName('')
+      onClose()
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Could not create the workspace. Please try again.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
   return <Modal open={open} onClose={onClose} title="Create a workspace" description="Give your team a shared home to get started.">
-    <form onSubmit={submit} className="flex flex-col gap-4"><div><label htmlFor="workspace-name" className="mb-1.5 block text-sm font-medium text-gray-700">Workspace name</label><input id="workspace-name" required autoComplete="off" value={name} onChange={(event) => { setName(event.target.value); setError('') }} aria-invalid={Boolean(error)} aria-describedby={error ? 'workspace-name-error' : undefined} placeholder="e.g. Northstar Studio" className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100" />{error && <p id="workspace-name-error" className="mt-1.5 text-xs text-red-600" role="alert">{error}</p>}</div><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>Cancel</Button><Button type="submit" className="bg-indigo-600 text-white hover:bg-indigo-700">Create workspace</Button></div></form>
+    <form onSubmit={submit} className="flex flex-col gap-4"><div><label htmlFor="workspace-name" className="mb-1.5 block text-sm font-medium text-gray-700">Workspace name</label><input id="workspace-name" required minLength={2} maxLength={80} autoComplete="off" value={name} onChange={(event) => { setName(event.target.value); setError('') }} aria-invalid={Boolean(error)} aria-describedby={error ? 'workspace-name-error' : undefined} placeholder="e.g. Northstar Studio" className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100" />{error && <p id="workspace-name-error" className="mt-1.5 text-xs text-red-600" role="alert">{error}</p>}</div><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button><Button type="submit" disabled={isSubmitting} className="bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? 'Creating…' : 'Create workspace'}</Button></div></form>
   </Modal>
 }
 

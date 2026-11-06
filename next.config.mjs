@@ -1,7 +1,18 @@
 /** @type {import('next').NextConfig} */
+const apiServerUrl = process.env.API_SERVER_URL?.replace(/\/$/, '') || 'http://localhost:4000'
+
 const nextConfig = {
+  transpilePackages: ['@syncspace/contracts'],
   images: {
     unoptimized: true,
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${apiServerUrl}/api/:path*`,
+      },
+    ]
   },
   async headers() {
     return [

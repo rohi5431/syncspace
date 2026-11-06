@@ -9,6 +9,8 @@
 
 # production
 /build
+/apps/api/dist/
+/apps/api/coverage/
 
 # debug
 npm-debug.log*

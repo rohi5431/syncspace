@@ -1,5 +1,14 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
 pmOnFail: ignore
 
 minimumReleaseAgeExclude:
   - '@next/*'
   - next
+
+allowBuilds:
+  '@parcel/watcher': true
+  '@scarf/scarf': false
+  bcrypt: true

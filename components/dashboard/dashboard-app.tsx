@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { ArrowRight, ArrowUpRight, CheckSquare2, FileText, FolderKanban, Plus, Sparkles } from 'lucide-react'
 import { AppSidebar } from '@/components/dashboard/app-sidebar'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
@@ -9,6 +10,7 @@ import { ActivityFeed, DocumentCard, OnlineMembers, ProjectCard } from '@/compon
 import { CreateDocumentDialog, CreateProjectDialog, PreviewDialog } from '@/components/dashboard/create-dialogs'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/providers/toast-provider'
+import { useAuth } from '@/lib/api-client'
 import { initialDocuments, initialProjects, type DocumentItem, type ProjectItem } from '@/lib/demo-data'
 
 export function DashboardApp() {
@@ -19,6 +21,12 @@ export function DashboardApp() {
   const [projects, setProjects] = useState(initialProjects)
   const [preview, setPreview] = useState<{ title: string; description: string } | null>(null)
   const toast = useToast()
+  const router = useRouter()
+  const { user, error, isLoading } = useAuth()
+
+  useEffect(() => {
+    if (!isLoading && error?.status === 401) router.replace('/login')
+  }, [error, isLoading, router])
 
   useEffect(() => {
     const showHelp = () => toast('Help center content is coming in a future phase.')
@@ -33,7 +41,7 @@ export function DashboardApp() {
     <AppSidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
     <div className="min-h-screen lg:pl-[264px]"><DashboardHeader onMenuClick={() => setMobileOpen(true)} documents={documents} projects={projects} />
       <main id="overview" className="mx-auto max-w-[1440px] px-4 pb-12 pt-7 sm:px-6 lg:px-8">
-        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="text-xs font-medium text-gray-500">Friday, November 6, 2026</p><h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-gray-950 sm:text-[30px]">Good morning, Rohit</h1><p className="mt-2 text-sm text-gray-500">Here&apos;s what&apos;s happening across your workspace.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => setProjectOpen(true)} className="h-10 rounded-lg border-gray-200 bg-white px-3.5 text-gray-700"><FolderKanban data-icon="inline-start" /> New project</Button><Button type="button" onClick={() => setDocumentOpen(true)} className="h-10 rounded-lg bg-indigo-600 px-3.5 text-white hover:bg-indigo-700"><Plus data-icon="inline-start" /> Create document</Button></div></div>
+        <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="text-xs font-medium text-gray-500">Friday, November 6, 2026</p><h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-gray-950 sm:text-[30px]">Good morning, {user?.name?.split(' ')[0] ?? 'there'}</h1><p className="mt-2 text-sm text-gray-500">Here&apos;s what&apos;s happening across your workspace.</p></div><div className="flex flex-wrap gap-2"><Button type="button" variant="outline" onClick={() => setProjectOpen(true)} className="h-10 rounded-lg border-gray-200 bg-white px-3.5 text-gray-700"><FolderKanban data-icon="inline-start" /> New project</Button><Button type="button" onClick={() => setDocumentOpen(true)} className="h-10 rounded-lg bg-indigo-600 px-3.5 text-white hover:bg-indigo-700"><Plus data-icon="inline-start" /> Create document</Button></div></div>
 
         <section aria-label="Workspace overview" className="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
