@@ -57,14 +57,14 @@ export function Modal({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/20 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby={description ? 'modal-description' : undefined} className={`w-full rounded-2xl border border-gray-200 bg-white p-6 shadow-xl ${size === 'md' ? 'max-w-lg' : 'max-w-md'}`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 p-4" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby={description ? 'modal-description' : undefined} className={`w-full rounded-2xl border border-border bg-white p-6 shadow-xl ${size === 'md' ? 'max-w-lg' : 'max-w-md'}`}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 id="modal-title" className="text-lg font-semibold tracking-tight text-gray-950">{title}</h2>
-            {description && <p id="modal-description" className="mt-1.5 text-sm leading-6 text-gray-500">{description}</p>}
+            <h2 id="modal-title" className="text-lg font-semibold tracking-tight text-foreground">{title}</h2>
+            {description && <p id="modal-description" className="mt-1.5 text-sm leading-6 text-muted-foreground">{description}</p>}
           </div>
-          <button type="button" onClick={onClose} className="-mr-2 -mt-2 rounded-lg p-2 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Close dialog">
+          <button type="button" onClick={onClose} className="-mr-2 -mt-2 rounded-lg p-2 text-muted-foreground transition hover:bg-surface-muted hover:text-foreground" aria-label="Close dialog">
             <X aria-hidden="true" className="size-4" />
           </button>
         </div>

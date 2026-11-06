@@ -63,11 +63,11 @@ export function DocumentFormDialog({
   const titleId = mode === 'create' ? 'create-document-title' : 'rename-document-title'
   return <Modal open={open} onClose={onClose} title={heading} description={mode === 'create' ? 'Start a document in this workspace.' : 'Update this document’s title and description.'}>
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <div><label htmlFor={titleId} className="mb-1.5 block text-sm font-medium text-gray-700">Document title</label><input id={titleId} required minLength={1} maxLength={200} autoComplete="off" value={title} onChange={(event) => setTitle(event.target.value)} className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100" /></div>
-      <div><label htmlFor={`${titleId}-description`} className="mb-1.5 block text-sm font-medium text-gray-700">Description <span className="font-normal text-gray-400">(optional)</span></label><textarea id={`${titleId}-description`} rows={3} maxLength={5000} value={description} onChange={(event) => setDescription(event.target.value)} className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100" /></div>
-      {mode === 'create' && <div><label htmlFor="create-document-folder" className="mb-1.5 block text-sm font-medium text-gray-700">Folder</label><select id="create-document-folder" value={folderId} onChange={(event) => setFolderId(event.target.value)} className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100"><option value="">No folder</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folderPath(folder, folders)}</option>)}</select></div>}
-      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving} className="bg-indigo-600 text-white hover:bg-indigo-700">{saving ? 'Saving…' : mode === 'create' ? 'Create document' : 'Save changes'}</Button></div>
+      <div><label htmlFor={titleId} className="mb-1.5 block text-sm font-medium text-foreground">Document title</label><input id={titleId} required minLength={1} maxLength={200} autoComplete="off" value={title} onChange={(event) => setTitle(event.target.value)} className="h-10 w-full rounded-lg border border-border px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/20" /></div>
+      <div><label htmlFor={`${titleId}-description`} className="mb-1.5 block text-sm font-medium text-foreground">Description <span className="font-normal text-muted-foreground">(optional)</span></label><textarea id={`${titleId}-description`} rows={3} maxLength={5000} value={description} onChange={(event) => setDescription(event.target.value)} className="w-full resize-none rounded-lg border border-border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/20" /></div>
+      {mode === 'create' && <div><label htmlFor="create-document-folder" className="mb-1.5 block text-sm font-medium text-foreground">Folder</label><select id="create-document-folder" value={folderId} onChange={(event) => setFolderId(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/20"><option value="">No folder</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folderPath(folder, folders)}</option>)}</select></div>}
+      {error && <p className="text-sm text-error" role="alert">{error}</p>}
+      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-hover">{saving ? 'Saving…' : mode === 'create' ? 'Create document' : 'Save changes'}</Button></div>
     </form>
   </Modal>
 }
@@ -111,9 +111,9 @@ export function MoveDocumentDialog({
 
   return <Modal open={open} onClose={onClose} title="Move document" description={`Choose a folder for “${document?.title ?? ''}”.`}>
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <div><label htmlFor="move-document-folder" className="mb-1.5 block text-sm font-medium text-gray-700">Destination folder</label><select id="move-document-folder" value={folderId} onChange={(event) => setFolderId(event.target.value)} className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100"><option value="">No folder</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folderPath(folder, folders)}</option>)}</select></div>
-      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving} className="bg-indigo-600 text-white hover:bg-indigo-700">{saving ? 'Moving…' : 'Move document'}</Button></div>
+      <div><label htmlFor="move-document-folder" className="mb-1.5 block text-sm font-medium text-foreground">Destination folder</label><select id="move-document-folder" value={folderId} onChange={(event) => setFolderId(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/20"><option value="">No folder</option>{folders.map((folder) => <option key={folder.id} value={folder.id}>{folderPath(folder, folders)}</option>)}</select></div>
+      {error && <p className="text-sm text-error" role="alert">{error}</p>}
+      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-hover">{saving ? 'Moving…' : 'Move document'}</Button></div>
     </form>
   </Modal>
 }
@@ -166,10 +166,10 @@ export function FolderFormDialog({
   const id = mode === 'create' ? 'create-folder-name' : 'rename-folder-name'
   return <Modal open={open} onClose={onClose} title={mode === 'create' ? 'Create a folder' : 'Rename folder'} description={mode === 'create' ? 'Folders can be nested inside another folder.' : 'Choose a clear name for this folder.'}>
     <form onSubmit={submit} className="flex flex-col gap-4">
-      <div><label htmlFor={id} className="mb-1.5 block text-sm font-medium text-gray-700">Folder name</label><input id={id} required minLength={1} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100" /></div>
-      {mode === 'create' && <div><label htmlFor="create-folder-parent" className="mb-1.5 block text-sm font-medium text-gray-700">Parent folder</label><select id="create-folder-parent" value={parentId} onChange={(event) => setParentId(event.target.value)} className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100"><option value="">Workspace root</option>{folders.map((item) => <option key={item.id} value={item.id}>{folderPath(item, folders)}</option>)}</select></div>}
-      {error && <p className="text-sm text-red-600" role="alert">{error}</p>}
-      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving} className="bg-indigo-600 text-white hover:bg-indigo-700">{saving ? 'Saving…' : mode === 'create' ? 'Create folder' : 'Save name'}</Button></div>
+      <div><label htmlFor={id} className="mb-1.5 block text-sm font-medium text-foreground">Folder name</label><input id={id} required minLength={1} maxLength={120} value={name} onChange={(event) => setName(event.target.value)} className="h-10 w-full rounded-lg border border-border px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/20" /></div>
+      {mode === 'create' && <div><label htmlFor="create-folder-parent" className="mb-1.5 block text-sm font-medium text-foreground">Parent folder</label><select id="create-folder-parent" value={parentId} onChange={(event) => setParentId(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm outline-none focus:border-ring focus:ring-3 focus:ring-ring/20"><option value="">Workspace root</option>{folders.map((item) => <option key={item.id} value={item.id}>{folderPath(item, folders)}</option>)}</select></div>}
+      {error && <p className="text-sm text-error" role="alert">{error}</p>}
+      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button type="submit" disabled={saving} className="bg-primary text-primary-foreground hover:bg-primary-hover">{saving ? 'Saving…' : mode === 'create' ? 'Create folder' : 'Save name'}</Button></div>
     </form>
   </Modal>
 }
@@ -206,7 +206,7 @@ export function ConfirmActionDialog({
   }
 
   return <Modal open={open} onClose={onClose} title={title} description={description}>
-    {error && <p className="mb-4 text-sm text-red-600" role="alert">{error}</p>}
+    {error && <p className="mb-4 text-sm text-error" role="alert">{error}</p>}
     <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button><Button type="button" variant="destructive" onClick={() => void confirm()} disabled={saving}>{saving ? 'Working…' : confirmLabel}</Button></div>
   </Modal>
 }

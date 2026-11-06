@@ -28,18 +28,18 @@ const actionCopy: Record<string, string> = {
 }
 
 export function ActivityFeed({ items, emptyMessage = 'Workspace activity will appear here.' }: { items: WorkspaceActivityItem[]; emptyMessage?: string }) {
-  if (!items.length) return <p className="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">{emptyMessage}</p>
+  if (!items.length) return <p className="rounded-lg border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">{emptyMessage}</p>
 
-  return <ol className="divide-y divide-gray-100">
+  return <ol className="divide-y divide-border">
     {items.map((item) => {
       const Icon = item.resourceType === 'document' ? FileText : item.resourceType === 'folder' ? Folder : item.resourceType === 'member' ? Users2 : Building2
       return <li key={item.id} className="flex items-start gap-3 py-3 first:pt-1 last:pb-1">
         <UserAvatar initials={getInitials(item.actor.name)} name={item.actor.name} size="sm" tone="slate" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm leading-5 text-gray-700"><span className="font-medium text-gray-900">{item.actor.name}</span>{' '}{actionCopy[item.action] ?? 'updated a workspace item'}{item.resourceName ? <> <span className="font-medium text-gray-900">{item.resourceName}</span></> : null}</p>
-          <p className="mt-1 text-xs text-gray-500">{formatRelativeDate(item.createdAt)}</p>
+          <p className="text-sm leading-5 text-foreground"><span className="font-medium text-foreground">{item.actor.name}</span>{' '}{actionCopy[item.action] ?? 'updated a workspace item'}{item.resourceName ? <> <span className="font-medium text-foreground">{item.resourceName}</span></> : null}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{formatRelativeDate(item.createdAt)}</p>
         </div>
-        <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-gray-400" />
+        <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       </li>
     })}
   </ol>

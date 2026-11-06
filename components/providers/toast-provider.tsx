@@ -28,10 +28,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       <div className="pointer-events-none fixed inset-x-4 bottom-4 z-[60] flex justify-center sm:inset-x-auto sm:right-5 sm:justify-end" aria-live="polite" aria-atomic="true">
         {message && (
-          <div role="status" className="pointer-events-auto flex max-w-md items-start gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 shadow-lg">
-            <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-green-600" />
+          <div role="status" className="pointer-events-auto flex max-w-md items-start gap-3 rounded-xl border border-border bg-white px-4 py-3 text-sm text-foreground shadow-lg">
+            <CheckCircle2 aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-success" />
             <p className="flex-1 leading-5">{message}</p>
-            <button type="button" onClick={() => setMessage(null)} className="rounded p-0.5 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700" aria-label="Dismiss notification">
+            <button type="button" onClick={() => setMessage(null)} className="rounded p-0.5 text-muted-foreground transition hover:bg-surface-muted hover:text-foreground" aria-label="Dismiss notification">
               <X aria-hidden="true" className="size-4" />
             </button>
           </div>

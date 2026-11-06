@@ -10,7 +10,13 @@
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
   --color-primary-foreground: var(--primary-foreground);
+  --color-pink: var(--pink);
+  --color-pink-soft: var(--pink-soft);
+  --color-cyan: var(--cyan);
+  --color-cyan-soft: var(--cyan-soft);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -21,6 +27,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-error: var(--error);
+  --color-error-soft: var(--error-soft);
+  --color-surface-muted: var(--surface-muted);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -29,25 +42,38 @@
 
 :root {
   color-scheme: light;
-  --background: #ffffff;
-  --foreground: #111827;
+  --background: #f3f3fc;
+  --foreground: #202033;
   --card: #ffffff;
-  --card-foreground: #111827;
+  --card-foreground: #202033;
   --popover: #ffffff;
-  --popover-foreground: #111827;
-  --primary: #4f46e5;
+  --popover-foreground: #202033;
+  --primary: #635bdb;
+  --primary-hover: #5148c8;
+  --primary-soft: #efedff;
   --primary-foreground: #ffffff;
-  --secondary: #f9fafb;
-  --secondary-foreground: #1f2937;
-  --muted: #f9fafb;
-  --muted-foreground: #6b7280;
-  --accent: #f9fafb;
-  --accent-foreground: #111827;
-  --destructive: #dc2626;
-  --border: #e5e7eb;
-  --input: #e5e7eb;
-  --ring: #4f46e5;
-  --radius: 0.65rem;
+  --pink: #e94fb5;
+  --pink-soft: #fce7f5;
+  --cyan: #36a9c9;
+  --cyan-soft: #e3f7fc;
+  --secondary: #e9eafb;
+  --secondary-foreground: #40358f;
+  --muted: #f7f7fc;
+  --muted-foreground: #77778f;
+  --accent: #efedff;
+  --accent-foreground: #40358f;
+  --destructive: #e45b68;
+  --border: #e8e8f1;
+  --input: #e8e8f1;
+  --ring: #635bdb;
+  --success: #16a879;
+  --success-soft: #e5f8ef;
+  --warning: #e99a35;
+  --warning-soft: #fff3df;
+  --error: #e45b68;
+  --error-soft: #fdebed;
+  --surface-muted: #fafaff;
+  --radius: 0.9rem;
 }
 
 * {
@@ -56,13 +82,13 @@
 
 html {
   scroll-behavior: smooth;
-  background: #ffffff;
+  background: var(--background);
 }
 
 body {
   min-height: 100vh;
-  background: #ffffff;
-  color: #111827;
+  background: var(--background);
+  color: var(--foreground);
   font-family: Geist, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -81,6 +107,159 @@ textarea {
 }
 
 ::selection {
-  background: #e0e7ff;
-  color: #312e81;
+  background: #efedff;
+  color: #40358f;
+}
+
+.ProseMirror {
+  min-height: 560px;
+  outline: none;
+  overflow-wrap: anywhere;
+  color: #202033;
+  font-size: 1rem;
+  line-height: 1.85;
+}
+
+.ProseMirror > * + * {
+  margin-top: 1rem;
+}
+
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3 {
+  color: #202033;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+  line-height: 1.25;
+}
+
+.ProseMirror h1 { font-size: clamp(2rem, 4vw, 2.6rem); }
+.ProseMirror h2 { font-size: clamp(1.5rem, 3vw, 1.9rem); }
+.ProseMirror h3 { font-size: 1.25rem; }
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #a0a0b5;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.5rem;
+}
+
+.ProseMirror ul { list-style: disc; }
+.ProseMirror ol { list-style: decimal; }
+
+.ProseMirror ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.15rem;
+}
+
+.ProseMirror ul[data-type='taskList'] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.ProseMirror ul[data-type='taskList'] input[type='checkbox'] {
+  margin-top: 0.55rem;
+  accent-color: #635bdb;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid #d6d2ff;
+  color: #5c5b74;
+  padding-left: 1rem;
+}
+
+.ProseMirror pre {
+  overflow-x: auto;
+  border: 1px solid #e8e8f1;
+  border-radius: 0.8rem;
+  background: #fafaff;
+  padding: 1rem 1.15rem;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.ProseMirror code {
+  border-radius: 0.35rem;
+  background: #f1f0fb;
+  padding: 0.12rem 0.3rem;
+  font-family: "Geist Mono", ui-monospace, monospace;
+  font-size: 0.88em;
+}
+
+.ProseMirror pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.ProseMirror a {
+  color: #5148c8;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ProseMirror img {
+  max-width: 100%;
+  border-radius: 0.8rem;
+}
+
+.ProseMirror table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  overflow: hidden;
+}
+
+.ProseMirror th,
+.ProseMirror td {
+  min-width: 7rem;
+  border: 1px solid #e8e8f1;
+  padding: 0.55rem 0.7rem;
+  vertical-align: top;
+}
+
+.ProseMirror th {
+  background: #fafaff;
+  font-weight: 600;
+  text-align: left;
+}
+
+.ProseMirror hr {
+  border: 0;
+  border-top: 1px solid #e8e8f1;
+}
+
+.collaboration-carets__caret {
+  position: relative;
+  margin-left: -1px;
+  margin-right: -1px;
+  border-left: 2px solid;
+  border-right: 2px solid;
+  overflow-wrap: normal;
+  pointer-events: none;
+}
+
+.collaboration-carets__label {
+  position: absolute;
+  z-index: 1;
+  top: -1.35em;
+  left: -2px;
+  border-radius: 0.35rem 0.35rem 0.35rem 0;
+  padding: 0.12rem 0.38rem;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.collaboration-carets__selection {
+  opacity: 0.18;
 }

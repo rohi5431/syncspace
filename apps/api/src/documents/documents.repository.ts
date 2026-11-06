@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { and, asc, count, desc, eq, exists, isNull, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, exists, isNull, ne, or, sql, type SQL } from 'drizzle-orm'
 import type {
   DocumentDetail,
   DocumentPermissionRole,
@@ -13,6 +13,7 @@ import type {
 import { DatabaseService } from '../database/database.service'
 import {
   activityLogs,
+  documentFavorites,
   documentPermissions,
   documentVersions,
   documents,
@@ -102,6 +103,27 @@ export class DocumentsRepository {
       conditions.push(sql`lower(${documents.title}) LIKE ${`${escapedSearch}%`} ESCAPE '\\'`)
     }
 
+    if (query.favoritesOnly) {
+      conditions.push(exists(this.database.db
+        .select({ id: documentFavorites.id })
+        .from(documentFavorites)
+        .where(and(
+          eq(documentFavorites.documentId, documents.id),
+          eq(documentFavorites.userId, userId),
+        ))))
+    }
+
+    if (query.sharedOnly) {
+      conditions.push(ne(documents.createdById, userId))
+      conditions.push(exists(this.database.db
+        .select({ id: documentPermissions.id })
+        .from(documentPermissions)
+        .where(and(
+          eq(documentPermissions.documentId, documents.id),
+          eq(documentPermissions.userId, userId),
+        ))))
+    }
+
     const where = and(...conditions)
     const [totalRecord] = await this.database.db
       .select({ total: count() })
@@ -119,6 +141,8 @@ export class DocumentsRepository {
         folderId: documents.folderId,
         createdById: documents.createdById,
         isArchived: documents.isArchived,
+        isFavorite: sql<boolean>`${documentFavorites.id} IS NOT NULL`,
+        collaboratorCount: sql<number>`(SELECT count(*)::int + 1 FROM public.document_permissions AS collaborators WHERE collaborators.document_id = ${documents.id})`,
         createdAt: documents.createdAt,
         updatedAt: documents.updatedAt,
         permissionRole: documentPermissions.role,
@@ -134,6 +158,10 @@ export class DocumentsRepository {
       .leftJoin(documentPermissions, and(
         eq(documentPermissions.documentId, documents.id),
         eq(documentPermissions.userId, userId),
+      ))
+      .leftJoin(documentFavorites, and(
+        eq(documentFavorites.documentId, documents.id),
+        eq(documentFavorites.userId, userId),
       ))
       .where(where)
       .orderBy(sort(sortColumn), sort(documents.id))
@@ -166,6 +194,8 @@ export class DocumentsRepository {
         folderId: documents.folderId,
         createdById: documents.createdById,
         isArchived: documents.isArchived,
+        isFavorite: sql<boolean>`${documentFavorites.id} IS NOT NULL`,
+        collaboratorCount: sql<number>`(SELECT count(*)::int + 1 FROM public.document_permissions AS collaborators WHERE collaborators.document_id = ${documents.id})`,
         createdAt: documents.createdAt,
         updatedAt: documents.updatedAt,
         workspaceRole: workspaceMembers.role,
@@ -186,6 +216,10 @@ export class DocumentsRepository {
         eq(documentPermissions.documentId, documents.id),
         eq(documentPermissions.userId, userId),
       ))
+      .leftJoin(documentFavorites, and(
+        eq(documentFavorites.documentId, documents.id),
+        eq(documentFavorites.userId, userId),
+      ))
       .innerJoin(users, eq(documents.createdById, users.id))
       .where(and(eq(documents.id, documentId), eq(documents.isDeleted, false)))
       .limit(1)
@@ -204,6 +238,8 @@ export class DocumentsRepository {
         createdById: record.createdById,
         createdBy: record.creator,
         isArchived: record.isArchived,
+        isFavorite: record.isFavorite,
+        collaboratorCount: Number(record.collaboratorCount),
         createdAt: record.createdAt.toISOString(),
         updatedAt: record.updatedAt.toISOString(),
         permissionRole: record.permissionRole,
@@ -413,6 +449,23 @@ export class DocumentsRepository {
     return record ? this.toVersion(record) : null
   }
 
+  async setFavorite(documentId: string, userId: string, isFavorite: boolean): Promise<void> {
+    if (isFavorite) {
+      await this.database.db
+        .insert(documentFavorites)
+        .values({ documentId, userId })
+        .onConflictDoNothing({ target: [documentFavorites.documentId, documentFavorites.userId] })
+      return
+    }
+
+    await this.database.db
+      .delete(documentFavorites)
+      .where(and(
+        eq(documentFavorites.documentId, documentId),
+        eq(documentFavorites.userId, userId),
+      ))
+  }
+
   async listPermissions(documentId: string): Promise<DocumentPermissionSummary[]> {
     const records = await this.database.db
       .select({
@@ -577,6 +630,8 @@ export class DocumentsRepository {
     folderId: string | null
     createdById: string
     isArchived: boolean
+    isFavorite: boolean
+    collaboratorCount: number
     createdAt: Date
     updatedAt: Date
     permissionRole: DocumentPermissionRole | null
@@ -594,6 +649,8 @@ export class DocumentsRepository {
       createdById: record.createdById,
       createdBy: record.creator,
       isArchived: record.isArchived,
+      isFavorite: record.isFavorite,
+      collaboratorCount: Number(record.collaboratorCount),
       createdAt: record.createdAt.toISOString(),
       updatedAt: record.updatedAt.toISOString(),
       permissionRole: record.permissionRole,

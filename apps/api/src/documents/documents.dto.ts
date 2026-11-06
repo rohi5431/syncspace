@@ -75,6 +75,18 @@ export class ListDocumentsQueryDto {
   @IsOptional()
   @IsIn(['asc', 'desc'])
   sortDirection: 'asc' | 'desc' = 'desc'
+
+  @ApiPropertyOptional({ description: 'Limit results to the authenticated user’s favorites.' })
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsOptional()
+  @IsBoolean()
+  favoritesOnly = false
+
+  @ApiPropertyOptional({ description: 'Limit results to documents explicitly shared with the authenticated user.' })
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsOptional()
+  @IsBoolean()
+  sharedOnly = false
 }
 
 export class UpdateDocumentMetadataDto {
@@ -133,6 +145,12 @@ export class UpdateDocumentContentDto {
   @IsString()
   @MaxLength(500)
   changeSummary?: string
+}
+
+export class UpdateDocumentFavoriteDto {
+  @ApiProperty({ description: 'Whether the document should appear in the authenticated user’s favorites.' })
+  @IsBoolean()
+  isFavorite!: boolean
 }
 
 export class ShareDocumentDto {

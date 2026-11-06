@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module'
 import { DocumentsModule } from './documents/documents.module'
 import { FoldersModule } from './folders/folders.module'
 import { RequestOriginGuard } from './common/guards/request-origin.guard'
+import { RealtimeModule } from './realtime/realtime.module'
 import { DatabaseModule } from './database/database.module'
 import { UsersModule } from './users/users.module'
 import { WorkspaceMembersModule } from './workspace-members/workspace-members.module'
@@ -40,6 +41,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module'
     WorkspaceMembersModule,
     FoldersModule,
     DocumentsModule,
+    RealtimeModule,
     ActivityModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: RequestOriginGuard }],

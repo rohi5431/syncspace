@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser'
 import { ValidationPipe } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { NestFactory } from '@nestjs/core'
+import { WsAdapter } from '@nestjs/platform-ws'
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger'
 import { ApiExceptionFilter } from './common/filters/api-exception.filter'
 import { ACCESS_COOKIE } from './auth/auth.cookies'
@@ -14,6 +15,7 @@ async function bootstrap() {
   const frontendOrigin = new URL(config.getOrThrow<string>('FRONTEND_URL')).origin
 
   app.setGlobalPrefix('api')
+  app.useWebSocketAdapter(new WsAdapter(app, { maxConcurrentMessages: 32, maxSendBufferSize: 2 * 1024 * 1024 }))
   app.getHttpAdapter().getInstance().disable('x-powered-by')
   app.use(cookieParser())
   app.enableCors({

@@ -27,6 +27,16 @@ export interface AuthSessionResponse {
 export type DocumentPermissionRole = 'VIEWER' | 'EDITOR'
 export type JsonObject = Record<string, unknown>
 
+export const REALTIME_FRAME = {
+  serverStateVector: 1,
+  clientStateVector: 2,
+  serverSyncUpdate: 3,
+  serverUpdate: 4,
+  serverAwareness: 5,
+  clientUpdate: 6,
+  clientAwareness: 7,
+} as const
+
 export interface PublicUserSummary {
   id: string
   name: string
@@ -71,6 +81,8 @@ export interface DocumentSummary {
   createdById: string
   createdBy: PublicUserSummary
   isArchived: boolean
+  isFavorite: boolean
+  collaboratorCount: number
   createdAt: string
   updatedAt: string
   permissionRole: DocumentPermissionRole | null

@@ -13,7 +13,9 @@ Copy `.env.example` to a local environment file, or configure the same variables
 - `PORT` — API port (default `4000`).
 - `NODE_ENV` — use `development` locally; development cookies use `SameSite=None; Secure` for the embedded v0 preview.
 
-The root Next.js app proxies `/api/*` to `API_SERVER_URL`, which defaults to `http://localhost:4000`. When deploying the frontend and API separately, set `API_SERVER_URL` on the frontend project and set `FRONTEND_URL` on the API to the frontend's exact origin.
+The root Next.js app proxies `/api/*` to `API_SERVER_URL`, which defaults to `http://localhost:4000`. When deploying the frontend and API separately, set `API_SERVER_URL` on the frontend project and set `FRONTEND_URL` on the API to the frontend's exact origin. The browser connects directly to the API WebSocket; Vercel external rewrites do not proxy WebSocket upgrades. Set `NEXT_PUBLIC_REALTIME_URL` on the frontend to the API's public `wss://<api-host>/realtime` endpoint. Local development falls back to `ws://localhost:4000/realtime`.
+
+The API's `FRONTEND_URL` must match the deployed frontend origin exactly so the gateway can validate the WebSocket `Origin` header. Deploy the NestJS API on a host that supports long-lived WebSocket connections and provide its reachable HTTPS/WSS endpoint to the frontend.
 
 ## Install and run
 
@@ -32,9 +34,13 @@ pnpm --filter @syncspace/api start:dev
 
 The frontend runs on port `3000`; the API runs on port `4000`. Swagger UI is available at `http://localhost:4000/api/docs` (and through the frontend proxy at `/api/docs`).
 
-## Phase 3 database schema
+## Database migrations
 
-The workspace document schema is recorded in `apps/api/migrations/0003_workspace_documents.sql` and has been applied to the connected Neon database. It adds folders, documents, document permissions, document versions, and activity logs with foreign keys, uniqueness constraints, and pagination/search indexes. For another environment, apply this migration before starting the API. The project uses Drizzle ORM to match the existing Phase 2 backend; do not run Prisma migrations against this schema.
+The workspace document schema is recorded in `apps/api/migrations/0003_workspace_documents.sql`; real-time binary snapshots and updates are in `0004_realtime_collaboration.sql`; per-user favorites are in `0005_document_favorites.sql`. These migrations have been applied to the connected Neon database. For another environment, apply them in order before starting the API. They add the document/version foundations, durable Yjs storage, and favorites with foreign keys and indexes. The project uses Drizzle ORM to match the existing backend; do not run Prisma migrations against this schema.
+
+## Collaborative editing
+
+The NestJS gateway serves `/realtime` directly through a WebSocket connection. It authenticates the existing HttpOnly access cookie, validates document access before joining, and rechecks each connected recipient before broadcasting updates, awareness, or presence. Binary Yjs updates are stored in PostgreSQL before the sender receives a durable acknowledgement; periodic snapshots and local IndexedDB persistence support recovery. On a frontend deployment, configure `NEXT_PUBLIC_REALTIME_URL` with the direct `wss://` API endpoint and configure `FRONTEND_URL` on the API to the exact frontend origin. The local preview uses `ws://localhost:4000/realtime`.
 
 ## Checks
 

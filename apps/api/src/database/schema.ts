@@ -6,6 +6,7 @@ import {
   index,
   integer,
   jsonb,
+  customType,
   pgEnum,
   pgTable,
   text,
@@ -216,5 +217,76 @@ export const activityLogs = pgTable(
       desc(table.createdAt),
       desc(table.id),
     ),
+  ],
+)
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType: () => 'bytea',
+})
+
+export const documentSnapshots = pgTable(
+  'document_snapshots',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    snapshotData: bytea('snapshot_data').notNull(),
+    stateVector: bytea('state_vector').notNull(),
+    createdById: uuid('created_by_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updateCount: integer('update_count').notNull().default(0),
+  },
+  (table) => [
+    index('document_snapshots_document_created_idx').on(
+      table.documentId,
+      desc(table.createdAt),
+      desc(table.id),
+    ),
+    check('document_snapshots_update_count_check', sql`${table.updateCount} >= 0`),
+  ],
+)
+
+export const documentUpdates = pgTable(
+  'document_updates',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    updateData: bytea('update_data').notNull(),
+    updateHash: varchar('update_hash', { length: 64 }).notNull(),
+    actorId: uuid('actor_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('document_updates_document_hash_key').on(table.documentId, table.updateHash),
+    index('document_updates_document_created_idx').on(
+      table.documentId,
+      table.createdAt,
+      table.id,
+    ),
+  ],
+)
+
+export const documentFavorites = pgTable(
+  'document_favorites',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    documentId: uuid('document_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('document_favorites_document_user_key').on(table.documentId, table.userId),
+    index('document_favorites_user_created_idx').on(table.userId, desc(table.createdAt)),
   ],
 )

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import useSWR from 'swr'
 import type { DocumentSummary, FolderSummary, PaginatedResult } from '@syncspace/contracts'
 import { ArrowDown, ArrowUp, FileText, Grid2X2, List, Plus, Search } from 'lucide-react'
@@ -14,11 +15,14 @@ import { useWorkspaceContext } from '@/components/dashboard/workspace-provider'
 import { ApiError, apiFetcher, apiRequest, useAuth } from '@/lib/api-client'
 import { refreshWorkspaceData } from '@/lib/workspace-data'
 
-export function DocumentsPage({ initialSearch = '' }: { initialSearch?: string }) {
+type DocumentCollection = 'all' | 'shared' | 'recent' | 'favorites'
+
+export function DocumentsPage({ initialSearch = '', initialView = 'all', initialCreate = false }: { initialSearch?: string; initialView?: DocumentCollection; initialCreate?: boolean }) {
   const { activeWorkspace, isLoading: workspacesLoading } = useWorkspaceContext()
   const { user } = useAuth()
   const toast = useToast()
   const [search, setSearch] = useState(initialSearch)
+  const [collection, setCollection] = useState<DocumentCollection>(initialView)
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState<'updatedAt' | 'createdAt'>('updatedAt')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
@@ -39,6 +43,14 @@ export function DocumentsPage({ initialSearch = '' }: { initialSearch?: string }
     setPage(1)
   }, [initialSearch])
   useEffect(() => {
+    setCollection(initialView)
+    setSelectedFolderId(null)
+    setPage(1)
+  }, [initialView])
+  useEffect(() => {
+    if (initialCreate) setCreateDocumentOpen(true)
+  }, [initialCreate])
+  useEffect(() => {
     setSelectedFolderId(null)
     setPage(1)
   }, [workspaceId])
@@ -47,8 +59,14 @@ export function DocumentsPage({ initialSearch = '' }: { initialSearch?: string }
     const params = new URLSearchParams({ page: String(page), pageSize: '20', sortBy, sortDirection })
     if (search.trim()) params.set('search', search.trim())
     if (selectedFolderId) params.set('folderId', selectedFolderId)
+    if (collection === 'favorites') params.set('favoritesOnly', 'true')
+    if (collection === 'shared') params.set('sharedOnly', 'true')
+    if (collection === 'recent') {
+      params.set('sortBy', 'updatedAt')
+      params.set('sortDirection', 'desc')
+    }
     return params.toString()
-  }, [page, search, selectedFolderId, sortBy, sortDirection])
+  }, [collection, page, search, selectedFolderId, sortBy, sortDirection])
   const documentsKey = workspaceId ? `/api/workspaces/${workspaceId}/documents?${query}` : null
   const foldersKey = workspaceId ? `/api/workspaces/${workspaceId}/folders` : null
   const { data, error, isLoading, mutate } = useSWR<PaginatedResult<DocumentSummary>, ApiError>(documentsKey, apiFetcher, { keepPreviousData: true })
@@ -57,6 +75,18 @@ export function DocumentsPage({ initialSearch = '' }: { initialSearch?: string }
   const folderNames = useMemo(() => new Map(visibleFolders.map((folder) => [folder.id, folder.name])), [visibleFolders])
   const ancestors = useMemo(() => getAncestors(selectedFolderId, visibleFolders), [selectedFolderId, visibleFolders])
   const loadError = error ?? foldersError
+  const collectionHeading = {
+    all: 'Documents',
+    shared: 'Shared with me',
+    recent: 'Recent documents',
+    favorites: 'Favorites',
+  }[collection]
+  const collectionDescription = {
+    all: 'Search, organize, and share documents you can access.',
+    shared: 'Documents shared directly with you by workspace teammates.',
+    recent: 'The latest documents updated in this workspace.',
+    favorites: 'Your saved documents, ready to pick up again.',
+  }[collection]
 
   const refresh = async () => {
     if (!workspaceId) return
@@ -117,6 +147,15 @@ export function DocumentsPage({ initialSearch = '' }: { initialSearch?: string }
     if (action === 'rename') setRenameDocument(document)
     if (action === 'move') setMoveDocument(document)
     if (action === 'share') setShareDocument(document)
+    if (action === 'favorite') {
+      try {
+        await apiRequest(`/documents/${document.id}/favorite`, { method: 'PATCH', body: { isFavorite: !document.isFavorite } })
+        await refresh()
+        toast(document.isFavorite ? 'Removed from favorites.' : 'Added to favorites.')
+      } catch (cause) {
+        toast(cause instanceof ApiError ? cause.message : 'Could not update this favorite.')
+      }
+    }
     if (action === 'delete') setDeleteDocument(document)
     if (action === 'duplicate') {
       try {
@@ -155,16 +194,34 @@ export function DocumentsPage({ initialSearch = '' }: { initialSearch?: string }
     setDeleteFolder(null)
   }
 
-  if (workspacesLoading) return <div className="rounded-xl border border-gray-200 bg-white p-8 text-sm text-gray-500" role="status">Loading your workspace…</div>
-  if (!activeWorkspace) return <div className="rounded-xl border border-dashed border-gray-300 bg-white px-6 py-14 text-center"><h1 className="text-lg font-semibold text-gray-900">No workspace selected</h1><p className="mt-2 text-sm text-gray-500">Create or join a workspace from the switcher to manage documents.</p></div>
+  if (workspacesLoading) return <div className="rounded-xl border border-border bg-white p-8 text-sm text-muted-foreground" role="status">Loading your workspace…</div>
+  if (!activeWorkspace) return <div className="rounded-xl border border-dashed border-border bg-white px-6 py-14 text-center"><h1 className="text-lg font-semibold text-foreground">No workspace selected</h1><p className="mt-2 text-sm text-muted-foreground">Create or join a workspace from the switcher to manage documents.</p></div>
 
   return <>
     <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-      <div><p className="text-xs font-medium text-gray-500">{activeWorkspace.name}</p><h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-gray-950 sm:text-[30px]">Documents</h1><p className="mt-2 text-sm text-gray-500">Search, organize, and share documents you can access.</p></div>
-      <Button type="button" onClick={() => setCreateDocumentOpen(true)} className="h-10 bg-indigo-600 px-3.5 text-white hover:bg-indigo-700"><Plus data-icon="inline-start" />Create document</Button>
+      <div><p className="text-xs font-medium text-primary">{activeWorkspace.name}</p><h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-foreground sm:text-[30px]">{collectionHeading}</h1><p className="mt-2 text-sm text-muted-foreground">{collectionDescription}</p></div>
+      <Button type="button" onClick={() => setCreateDocumentOpen(true)} className="h-10 px-3.5"><Plus data-icon="inline-start" />Create document</Button>
     </div>
 
-    <div className="mt-7 grid items-start gap-4 xl:grid-cols-[230px_minmax(0,1fr)]">
+    <nav aria-label="Document collections" className="mt-6 flex flex-wrap gap-1.5">
+      {([
+        ['all', 'All documents'],
+        ['shared', 'Shared with me'],
+        ['recent', 'Recent'],
+        ['favorites', 'Favorites'],
+      ] as const).map(([value, label]) => (
+        <Link
+          key={value}
+          href={value === 'all' ? '/dashboard/documents' : `/dashboard/documents?view=${value}`}
+          aria-current={collection === value ? 'page' : undefined}
+          className={`rounded-lg px-3 py-2 text-xs font-medium transition ${collection === value ? 'bg-white text-primary shadow-sm ring-1 ring-border' : 'text-muted-foreground hover:bg-white/70 hover:text-foreground'}`}
+        >
+          {label}
+        </Link>
+      ))}
+    </nav>
+
+    <div className="mt-5 grid items-start gap-4 xl:grid-cols-[230px_minmax(0,1fr)]">
       <FolderSidebar
         folders={visibleFolders}
         selectedFolderId={selectedFolderId}
@@ -176,28 +233,30 @@ export function DocumentsPage({ initialSearch = '' }: { initialSearch?: string }
         onDelete={setDeleteFolder}
       />
 
-      <section aria-label="Workspace documents" className="min-w-0 rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+      <section aria-label="Workspace documents" className="min-w-0 rounded-2xl border border-border bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
-            <button type="button" onClick={() => { setSelectedFolderId(null); setPage(1) }} className={`rounded-md px-2 py-1.5 ${selectedFolderId === null ? 'font-semibold text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}>All documents</button>
-            {selectedFolderId === 'root' && <><span className="text-gray-300">/</span><span className="px-1 text-gray-700">Unfiled</span></>}
-            {ancestors.map((folder) => <span key={folder.id} className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="text-gray-300">/</span><button type="button" onClick={() => setSelectedFolderId(folder.id)} aria-current={selectedFolderId === folder.id ? 'page' : undefined} className={`max-w-40 truncate rounded-md px-2 py-1.5 ${selectedFolderId === folder.id ? 'font-semibold text-gray-900' : 'text-gray-500 hover:bg-gray-50'}`}>{folder.name}</button></span>)}
+            <button type="button" onClick={() => { setSelectedFolderId(null); setPage(1) }} className={`rounded-md px-2 py-1.5 ${selectedFolderId === null ? 'font-semibold text-foreground' : 'text-muted-foreground hover:bg-surface-muted'}`}>{collectionHeading}</button>
+            {selectedFolderId === 'root' && <><span className="text-border">/</span><span className="px-1 text-foreground">Unfiled</span></>}
+            {ancestors.map((folder) => <span key={folder.id} className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="text-border">/</span><button type="button" onClick={() => setSelectedFolderId(folder.id)} aria-current={selectedFolderId === folder.id ? 'page' : undefined} className={`max-w-40 truncate rounded-md px-2 py-1.5 ${selectedFolderId === folder.id ? 'font-semibold text-foreground' : 'text-muted-foreground hover:bg-surface-muted'}`}>{folder.name}</button></span>)}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="relative min-w-[190px] flex-1 sm:flex-none"><span className="sr-only">Search document titles</span><Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-gray-400" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search titles" className="h-9 w-full rounded-lg border border-gray-200 pl-9 pr-3 text-xs outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100 sm:w-52" /></label>
-            <label className="sr-only" htmlFor="document-sort">Sort documents</label><select id="document-sort" value={sortBy} onChange={(event) => setSortBy(event.target.value as 'updatedAt' | 'createdAt')} className="h-9 rounded-lg border border-gray-200 bg-white px-2.5 text-xs text-gray-600 outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100"><option value="updatedAt">Last updated</option><option value="createdAt">Date created</option></select>
-            <Button type="button" variant="outline" size="icon" onClick={() => setSortDirection((current) => current === 'desc' ? 'asc' : 'desc')} aria-label={`Sort ${sortDirection === 'desc' ? 'oldest first' : 'newest first'}`} className="size-9">{sortDirection === 'desc' ? <ArrowDown /> : <ArrowUp />}</Button>
-            <div className="flex rounded-lg border border-gray-200 p-0.5" aria-label="Document layout">
-              <button type="button" onClick={() => setView('grid')} aria-label="Grid view" aria-pressed={view === 'grid'} className={`grid size-8 place-items-center rounded-md ${view === 'grid' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-50'}`}><Grid2X2 aria-hidden="true" className="size-4" /></button>
-              <button type="button" onClick={() => setView('list')} aria-label="List view" aria-pressed={view === 'list'} className={`grid size-8 place-items-center rounded-md ${view === 'list' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-500 hover:bg-gray-50'}`}><List aria-hidden="true" className="size-4" /></button>
+            <label className="relative min-w-[190px] flex-1 sm:flex-none"><span className="sr-only">Search document titles</span><Search aria-hidden="true" className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" /><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Search titles" className="h-9 w-full rounded-lg border border-border pl-9 pr-3 text-xs outline-none focus:border-ring focus:ring-3 focus:ring-ring/20 sm:w-52" /></label>
+            {collection !== 'recent' && <>
+              <label className="sr-only" htmlFor="document-sort">Sort documents</label><select id="document-sort" value={sortBy} onChange={(event) => setSortBy(event.target.value as 'updatedAt' | 'createdAt')} className="h-9 rounded-lg border border-border bg-white px-2.5 text-xs text-muted-foreground outline-none focus:border-ring focus:ring-3 focus:ring-ring/20"><option value="updatedAt">Last updated</option><option value="createdAt">Date created</option></select>
+              <Button type="button" variant="outline" size="icon" onClick={() => setSortDirection((current) => current === 'desc' ? 'asc' : 'desc')} aria-label={`Sort ${sortDirection === 'desc' ? 'oldest first' : 'newest first'}`} className="size-9">{sortDirection === 'desc' ? <ArrowDown /> : <ArrowUp />}</Button>
+            </>}
+            <div className="flex rounded-lg border border-border p-0.5" aria-label="Document layout">
+              <button type="button" onClick={() => setView('grid')} aria-label="Grid view" aria-pressed={view === 'grid'} className={`grid size-8 place-items-center rounded-md ${view === 'grid' ? 'bg-accent text-primary-hover' : 'text-muted-foreground hover:bg-surface-muted'}`}><Grid2X2 aria-hidden="true" className="size-4" /></button>
+              <button type="button" onClick={() => setView('list')} aria-label="List view" aria-pressed={view === 'list'} className={`grid size-8 place-items-center rounded-md ${view === 'list' ? 'bg-accent text-primary-hover' : 'text-muted-foreground hover:bg-surface-muted'}`}><List aria-hidden="true" className="size-4" /></button>
             </div>
           </div>
         </div>
 
-        {loadError && <p className="mt-4 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-red-700" role="alert">{loadError.message}</p>}
-        {isLoading ? <p className="mt-8 rounded-lg border border-gray-200 px-4 py-10 text-center text-sm text-gray-500" role="status">Loading documents…</p> : data?.items.length ? view === 'grid' ? <div className="mt-5 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">{data.items.map((document) => <DocumentCard key={document.id} document={document} folderName={document.folderId ? folderNames.get(document.folderId) : undefined} onAction={(action, item) => void onAction(action, item)} />)}</div> : <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[600px] text-left"><thead><tr className="text-[10px] font-semibold uppercase tracking-wider text-gray-400"><th className="pb-2 pr-3">Document</th><th className="hidden pb-2 pr-3 md:table-cell">Folder</th><th className="hidden pb-2 pr-3 sm:table-cell">Creator</th><th className="pb-2 pr-2">Updated</th><th className="pb-2 text-right"><span className="sr-only">Actions</span></th></tr></thead><tbody>{data.items.map((document) => <DocumentRow key={document.id} document={document} folderName={document.folderId ? folderNames.get(document.folderId) : undefined} onAction={(action, item) => void onAction(action, item)} />)}</tbody></table></div> : <div className="mt-5 rounded-xl border border-dashed border-gray-300 px-6 py-14 text-center"><FileText aria-hidden="true" className="mx-auto size-6 text-gray-300" /><p className="mt-3 text-sm font-medium text-gray-700">{search ? 'No matching documents' : selectedFolderId ? 'This folder is empty' : 'No documents yet'}</p><p className="mt-1 text-xs text-gray-500">{search ? 'Try a different title or clear your search.' : 'Create a document to start building your workspace library.'}</p>{!search && <Button type="button" onClick={() => setCreateDocumentOpen(true)} className="mt-4 bg-indigo-600 text-white hover:bg-indigo-700">Create document</Button>}</div>}
+        {loadError && <p className="mt-4 rounded-lg border border-error/20 bg-white px-3 py-2 text-sm text-error" role="alert">{loadError.message}</p>}
+        {isLoading ? <p className="mt-8 rounded-lg border border-border px-4 py-10 text-center text-sm text-muted-foreground" role="status">Loading documents…</p> : data?.items.length ? view === 'grid' ? <div className="mt-5 grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">{data.items.map((document) => <DocumentCard key={document.id} document={document} folderName={document.folderId ? folderNames.get(document.folderId) : undefined} onAction={(action, item) => void onAction(action, item)} />)}</div> : <div className="mt-5 overflow-x-auto"><table className="w-full min-w-[600px] text-left"><thead><tr className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"><th className="pb-2 pr-3">Document</th><th className="hidden pb-2 pr-3 md:table-cell">Folder</th><th className="hidden pb-2 pr-3 sm:table-cell">Creator</th><th className="pb-2 pr-2">Updated</th><th className="pb-2 text-right"><span className="sr-only">Actions</span></th></tr></thead><tbody>{data.items.map((document) => <DocumentRow key={document.id} document={document} folderName={document.folderId ? folderNames.get(document.folderId) : undefined} onAction={(action, item) => void onAction(action, item)} />)}</tbody></table></div> : <div className="mt-5 rounded-xl border border-dashed border-border px-6 py-14 text-center"><FileText aria-hidden="true" className="mx-auto size-6 text-border" /><p className="mt-3 text-sm font-medium text-foreground">{search ? 'No matching documents' : selectedFolderId ? 'This folder is empty' : collection === 'favorites' ? 'No favorites yet' : collection === 'shared' ? 'Nothing has been shared with you yet' : 'No documents yet'}</p><p className="mt-1 text-xs text-muted-foreground">{search ? 'Try a different title or clear your search.' : collection === 'favorites' ? 'Favorite a document to keep it close at hand.' : collection === 'shared' ? 'Documents shared directly with you will appear here.' : collectionDescription}</p>{!search && collection === 'all' && <Button type="button" onClick={() => setCreateDocumentOpen(true)} className="mt-4">Create document</Button>}</div>}
 
-        <div className="mt-5 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-gray-500">{data?.total ?? 0} {data?.total === 1 ? 'document' : 'documents'}{search ? ' matching your search' : ''}</p><div className="flex items-center justify-end gap-2"><span className="text-xs text-gray-500">Page {data?.page ?? page} of {Math.max(data?.pageCount ?? 0, 1)}</span><Button type="button" variant="outline" size="sm" disabled={page <= 1 || isLoading} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button><Button type="button" variant="outline" size="sm" disabled={!data || page >= data.pageCount || isLoading} onClick={() => setPage((current) => current + 1)}>Next</Button></div></div>
+        <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-muted-foreground">{data?.total ?? 0} {data?.total === 1 ? 'document' : 'documents'}{search ? ' matching your search' : ''}</p><div className="flex items-center justify-end gap-2"><span className="text-xs text-muted-foreground">Page {data?.page ?? page} of {Math.max(data?.pageCount ?? 0, 1)}</span><Button type="button" variant="outline" size="sm" disabled={page <= 1 || isLoading} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button><Button type="button" variant="outline" size="sm" disabled={!data || page >= data.pageCount || isLoading} onClick={() => setPage((current) => current + 1)}>Next</Button></div></div>
       </section>
     </div>
 

@@ -56,6 +56,37 @@ export class DocumentsService {
     return (await this.requireAccess(documentId, userId)).document
   }
 
+  async getAccess(documentId: string, userId: string) {
+    return this.requireAccess(documentId, userId)
+  }
+
+  async setFavorite(documentId: string, userId: string, isFavorite: boolean) {
+    await this.requireAccess(documentId, userId)
+    await this.repository.setFavorite(documentId, userId, isFavorite)
+    return { isFavorite }
+  }
+
+  async createVersion(documentId: string, userId: string, input: UpdateDocumentContentDto) {
+    const access = await this.requireAccess(documentId, userId)
+    this.requireEdit(access.canEdit)
+    const versionNumber = await this.repository.updateContent(
+      documentId,
+      userId,
+      input.content,
+      input.changeSummary?.trim() || null,
+    )
+    if (versionNumber === null) throw new NotFoundException('Document not found.')
+    return { document: await this.get(documentId, userId), versionNumber }
+  }
+
+  async restoreVersionContent(documentId: string, versionId: string, userId: string) {
+    const access = await this.requireAccess(documentId, userId)
+    this.requireEdit(access.canEdit)
+    const version = await this.repository.getVersion(documentId, versionId)
+    if (!version) throw new NotFoundException('Document version not found.')
+    return { title: version.title, content: version.content, versionNumber: version.versionNumber }
+  }
+
   async updateMetadata(documentId: string, userId: string, input: UpdateDocumentMetadataDto): Promise<DocumentDetail> {
     if (!Object.keys(input).length) throw new BadRequestException('Provide document metadata to update.')
     const access = await this.requireAccess(documentId, userId)

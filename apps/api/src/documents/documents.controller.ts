@@ -28,6 +28,7 @@ import {
   ListVersionsQueryDto,
   ShareDocumentDto,
   UpdateDocumentContentDto,
+  UpdateDocumentFavoriteDto,
   UpdateDocumentMetadataDto,
   UpdateDocumentPermissionDto,
 } from './documents.dto'
@@ -84,6 +85,16 @@ export class DocumentsController {
     @Body() body: UpdateDocumentContentDto,
   ) {
     return this.documents.updateContent(documentId, user.id, body)
+  }
+
+  @Patch('documents/:documentId/favorite')
+  @ApiOkResponse({ description: 'The authenticated user’s document favorite state was updated.' })
+  setFavorite(
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: UpdateDocumentFavoriteDto,
+  ) {
+    return this.documents.setFavorite(documentId, user.id, body.isFavorite)
   }
 
   @Delete('documents/:documentId')
@@ -155,5 +166,25 @@ export class DocumentsController {
     @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.documents.getVersion(documentId, versionId, user.id)
+  }
+
+  @Post('documents/:documentId/versions')
+  @ApiCreatedResponse({ description: 'A new immutable version created from the current synchronized editor content.' })
+  createVersion(
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: UpdateDocumentContentDto,
+  ) {
+    return this.documents.createVersion(documentId, user.id, body)
+  }
+
+  @Post('documents/:documentId/versions/:versionId/restore')
+  @ApiOkResponse({ description: 'A historical snapshot returned for a permission-checked collaborative restore.' })
+  restoreVersion(
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+    @Param('versionId', ParseUUIDPipe) versionId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.documents.restoreVersionContent(documentId, versionId, user.id)
   }
 }
