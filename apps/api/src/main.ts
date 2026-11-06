@@ -32,7 +32,7 @@ async function bootstrap() {
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('SyncSpace API')
-    .setDescription('Authentication and workspace management API.')
+    .setDescription('Authenticated workspace, document, folder, sharing, version history, and activity APIs.')
     .setVersion('1.0.0')
     .addCookieAuth(ACCESS_COOKIE, { type: 'apiKey', in: 'cookie' }, ACCESS_COOKIE)
     .build()

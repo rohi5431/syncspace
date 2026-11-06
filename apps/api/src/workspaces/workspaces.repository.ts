@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common'
 import { and, desc, eq, exists } from 'drizzle-orm'
 import type { WorkspaceRole, WorkspaceSummary } from '@syncspace/contracts'
 import { DatabaseService } from '../database/database.service'
-import { workspaceMembers, workspaces } from '../database/schema'
+import { activityLogs, workspaceMembers, workspaces } from '../database/schema'
 
 interface WorkspaceRecord {
   id: string
@@ -88,6 +88,14 @@ export class WorkspacesRepository {
         .insert(workspaceMembers)
         .values({ workspaceId: workspace.id, userId: input.ownerId, role: 'OWNER' })
         .returning({ role: workspaceMembers.role })
+      await transaction.insert(activityLogs).values({
+        workspaceId: workspace.id,
+        actorId: input.ownerId,
+        action: 'workspace.created',
+        resourceType: 'workspace',
+        resourceId: workspace.id,
+        metadata: { name: workspace.name },
+      })
 
       return this.toSummary({ ...workspace, role: membership.role })
     })
@@ -98,23 +106,40 @@ export class WorkspacesRepository {
     userId: string,
     input: { name?: string; description?: string | null },
   ): Promise<WorkspaceSummary | null> {
-    const memberExists = this.database.db
-      .select({ id: workspaceMembers.id })
-      .from(workspaceMembers)
-      .where(and(
-        eq(workspaceMembers.workspaceId, workspaces.id),
-        eq(workspaceMembers.userId, userId),
-      ))
+    return this.database.db.transaction(async (transaction) => {
+      const memberExists = transaction
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(and(
+          eq(workspaceMembers.workspaceId, workspaces.id),
+          eq(workspaceMembers.userId, userId),
+        ))
 
-    const [record] = await this.database.db
-      .update(workspaces)
-      .set({ ...input, updatedAt: new Date() })
-      .where(and(eq(workspaces.id, workspaceId), exists(memberExists)))
-      .returning()
+      const [record] = await transaction
+        .update(workspaces)
+        .set({ ...input, updatedAt: new Date() })
+        .where(and(eq(workspaces.id, workspaceId), exists(memberExists)))
+        .returning()
+      if (!record) return null
 
-    if (!record) return null
-    const role = await this.getMembership(workspaceId, userId)
-    return role ? this.toSummary({ ...record, role }) : null
+      await transaction.insert(activityLogs).values({
+        workspaceId,
+        actorId: userId,
+        action: 'workspace.updated',
+        resourceType: 'workspace',
+        resourceId: workspaceId,
+        metadata: { name: record.name },
+      })
+      const [membership] = await transaction
+        .select({ role: workspaceMembers.role })
+        .from(workspaceMembers)
+        .where(and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.userId, userId),
+        ))
+        .limit(1)
+      return membership ? this.toSummary({ ...record, role: membership.role }) : null
+    })
   }
 
   async deleteForMember(workspaceId: string, userId: string) {

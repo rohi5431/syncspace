@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { mutate } from 'swr'
-import { BarChart3, CheckSquare2, FileText, FolderKanban, HelpCircle, LayoutDashboard, LogOut, Settings2, Users2, X } from 'lucide-react'
+import { BarChart3, FileText, HelpCircle, LayoutDashboard, LogOut, Settings2, Users2, X } from 'lucide-react'
 import { Brand } from '@/components/brand/brand'
 import { UserAvatar } from '@/components/dashboard/user-avatar'
 import { WorkspaceSwitcher } from '@/components/dashboard/workspace-switcher'
@@ -12,11 +12,9 @@ import { apiRequest, AUTH_USER_KEY, getInitials, useAuth, WORKSPACES_KEY } from 
 import { useToast } from '@/components/providers/toast-provider'
 
 const mainNav = [
-  { label: 'Dashboard', href: '/dashboard#overview', icon: LayoutDashboard },
-  { label: 'My documents', href: '/dashboard#documents', icon: FileText },
-  { label: 'Recent documents', href: '/dashboard#recent-documents', icon: BarChart3 },
-  { label: 'Projects', href: '/dashboard#projects', icon: FolderKanban },
-  { label: 'Tasks', href: '/dashboard#tasks', icon: CheckSquare2 },
+  { label: 'Overview', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Documents', href: '/dashboard/documents', icon: FileText },
+  { label: 'Activity', href: '/dashboard#activity', icon: BarChart3 },
   { label: 'Team members', href: '/dashboard#team', icon: Users2 },
 ]
 
@@ -34,7 +32,7 @@ export function AppSidebar({ mobileOpen, onClose }: { mobileOpen: boolean; onClo
       <nav aria-label="Workspace navigation" className="mt-7 flex-1 px-3">
         <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">Workspace</p>
         <div className="flex flex-col gap-1">{mainNav.map(({ label, href, icon: Icon }) => {
-          const active = pathname === '/dashboard' && label === 'Dashboard'
+          const active = (label === 'Overview' && pathname === '/dashboard') || (label === 'Documents' && pathname.startsWith('/dashboard/documents'))
           return <Link key={label} href={href} onClick={onClose} aria-current={active ? 'page' : undefined} className={`flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] transition ${active ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}><Icon aria-hidden="true" className="size-[16px]" />{label}</Link>
         })}</div>
         <div className="mt-8 border-t border-gray-100 pt-5"><p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-gray-400">Manage</p><Link href="/settings" onClick={onClose} aria-current={pathname === '/settings' ? 'page' : undefined} className={`flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] transition ${pathname === '/settings' ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}><Settings2 aria-hidden="true" className="size-[16px]" /> Settings</Link><button type="button" onClick={() => window.dispatchEvent(new CustomEvent('syncspace:help'))} className="mt-1 flex h-9 w-full items-center gap-3 rounded-lg px-3 text-left text-[13px] text-gray-600 transition hover:bg-gray-50 hover:text-gray-900"><HelpCircle aria-hidden="true" className="size-[16px]" /> Help center</button></div>

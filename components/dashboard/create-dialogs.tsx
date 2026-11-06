@@ -40,8 +40,9 @@ export function CreateProjectDialog({ open, onClose, onCreate }: { open: boolean
   </Modal>
 }
 
-export function CreateWorkspaceDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (name: string) => Promise<void> }) {
+export function CreateWorkspaceDialog({ open, onClose, onCreate }: { open: boolean; onClose: () => void; onCreate: (name: string, description: string) => Promise<void> }) {
   const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -54,8 +55,9 @@ export function CreateWorkspaceDialog({ open, onClose, onCreate }: { open: boole
     setError('')
     setIsSubmitting(true)
     try {
-      await onCreate(value)
+      await onCreate(value, description.trim())
       setName('')
+      setDescription('')
       onClose()
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Could not create the workspace. Please try again.')
@@ -64,7 +66,7 @@ export function CreateWorkspaceDialog({ open, onClose, onCreate }: { open: boole
     }
   }
   return <Modal open={open} onClose={onClose} title="Create a workspace" description="Give your team a shared home to get started.">
-    <form onSubmit={submit} className="flex flex-col gap-4"><div><label htmlFor="workspace-name" className="mb-1.5 block text-sm font-medium text-gray-700">Workspace name</label><input id="workspace-name" required minLength={2} maxLength={80} autoComplete="off" value={name} onChange={(event) => { setName(event.target.value); setError('') }} aria-invalid={Boolean(error)} aria-describedby={error ? 'workspace-name-error' : undefined} placeholder="e.g. Northstar Studio" className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100" />{error && <p id="workspace-name-error" className="mt-1.5 text-xs text-red-600" role="alert">{error}</p>}</div><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button><Button type="submit" disabled={isSubmitting} className="bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? 'Creating…' : 'Create workspace'}</Button></div></form>
+    <form onSubmit={submit} className="flex flex-col gap-4"><div><label htmlFor="workspace-name" className="mb-1.5 block text-sm font-medium text-gray-700">Workspace name</label><input id="workspace-name" required minLength={2} maxLength={80} autoComplete="off" value={name} onChange={(event) => { setName(event.target.value); setError('') }} aria-invalid={Boolean(error)} aria-describedby={error ? 'workspace-name-error' : undefined} placeholder="e.g. Northstar Studio" className="h-10 w-full rounded-lg border border-gray-200 px-3 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100" />{error && <p id="workspace-name-error" className="mt-1.5 text-xs text-red-600" role="alert">{error}</p>}</div><div><label htmlFor="workspace-description" className="mb-1.5 block text-sm font-medium text-gray-700">Description <span className="font-normal text-gray-400">(optional)</span></label><textarea id="workspace-description" rows={3} maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="What will your team work on here?" className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100" /></div><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>Cancel</Button><Button type="submit" disabled={isSubmitting} className="bg-indigo-600 text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? 'Creating…' : 'Create workspace'}</Button></div></form>
   </Modal>
 }
 

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     template: '%s · SyncSpace',
   },
   description:
-    'One calm, connected workspace for your team’s documents, projects, and collaboration.',
+    'A secure shared workspace for your team’s documents, folders, permissions, and activity.',
   generator: 'v0.app',
   icons: {
     icon: '/icon.svg',

@@ -3,10 +3,14 @@ import { Module } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
 import { ConfigModule } from '@nestjs/config'
 import Joi from 'joi'
+import { ActivityModule } from './activity/activity.module'
 import { AuthModule } from './auth/auth.module'
+import { DocumentsModule } from './documents/documents.module'
+import { FoldersModule } from './folders/folders.module'
 import { RequestOriginGuard } from './common/guards/request-origin.guard'
 import { DatabaseModule } from './database/database.module'
 import { UsersModule } from './users/users.module'
+import { WorkspaceMembersModule } from './workspace-members/workspace-members.module'
 import { WorkspacesModule } from './workspaces/workspaces.module'
 
 @Module({
@@ -33,6 +37,10 @@ import { WorkspacesModule } from './workspaces/workspaces.module'
     UsersModule,
     AuthModule,
     WorkspacesModule,
+    WorkspaceMembersModule,
+    FoldersModule,
+    DocumentsModule,
+    ActivityModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: RequestOriginGuard }],
 })
