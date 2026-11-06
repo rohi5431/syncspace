@@ -1,0 +1,43 @@
+name: CI
+on:
+  push: { branches: [main, develop] }
+  pull_request: { branches: [main] }
+concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
+permissions: { contents: read }
+env: { NODE_VERSION: '22' }
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 12.3.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: ${{ env.NODE_VERSION }}, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm build
+  backend:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('backend/api/package.json') != '' }}
+    services:
+      postgres: { image: postgres:16, env: { POSTGRES_PASSWORD: test, POSTGRES_DB: syncspace_test }, ports: ['5432:5432'], options: >-\n        --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5 }
+      redis: { image: redis:7, ports: ['6379:6379'] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 12.3.4 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir backend/api exec prisma migrate deploy
+        env: { DATABASE_URL: postgresql://postgres:test@localhost:5432/syncspace_test }
+      - run: pnpm --dir backend/api test --if-present
+      - run: pnpm --dir backend/api build
+  required:
+    if: always()
+    needs: [frontend, backend]
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ needs.frontend.result }}" = success && (test "${{ needs.backend.result }}" = success || test "${{ needs.backend.result }}" = skipped)

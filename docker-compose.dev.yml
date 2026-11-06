@@ -1,0 +1,10 @@
+services:
+  web:
+    extends: { file: docker-compose.yml, service: web }
+    build: { context: ., target: builder }
+    command: pnpm dev
+    volumes: [.:/app, /app/node_modules]
+  postgres:
+    extends: { file: docker-compose.yml, service: postgres }
+  redis:
+    extends: { file: docker-compose.yml, service: redis }

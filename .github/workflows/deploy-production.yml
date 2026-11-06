@@ -1,0 +1,18 @@
+name: Deploy production
+on:
+  push: { tags: ['v*.*.*'] }
+  workflow_dispatch:
+permissions: { contents: read, packages: read }
+concurrency: { group: production, cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy approved release over SSH
+        if: ${{ secrets.PRODUCTION_HOST != '' }}
+        uses: appleboy/ssh-action@v1.2.0
+        with: { host: ${{ secrets.PRODUCTION_HOST }}, username: ${{ secrets.PRODUCTION_USER }}, key: ${{ secrets.PRODUCTION_SSH_KEY }}, script: 'cd ${{ secrets.PRODUCTION_PATH }} && IMAGE_TAG=${{ github.ref_name }} ./scripts/deploy-production.sh' }
+      - run: echo "Production deployment skipped; configure the protected production environment secrets to enable it."
+        if: ${{ secrets.PRODUCTION_HOST == '' }}

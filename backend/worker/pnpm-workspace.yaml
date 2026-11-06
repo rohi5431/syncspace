@@ -1,0 +1,7 @@
+pmOnFail: ignore
+
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  msgpackr-extract: true
+  prisma: true

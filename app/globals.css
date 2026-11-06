@@ -1,0 +1,102 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+:root {
+  color-scheme: light;
+  --background: #F7F5FF;
+  --foreground: #1F2937;
+  --card: #ffffff;
+  --card-foreground: #1F2937;
+  --popover: #ffffff;
+  --popover-foreground: #1F2937;
+  --primary: #6C4CF1;
+  --primary-hover: #5738D6;
+  --primary-foreground: #ffffff;
+  --secondary: #F7F5FF;
+  --secondary-foreground: #1F2937;
+  --accent-pink: #EC4899;
+  --muted: #F7F5FF;
+  --muted-foreground: #6B7280;
+  --accent: #F7F5FF;
+  --accent-foreground: #1F2937;
+  --destructive: #DC2626;
+  --border: #E9E7F0;
+  --input: #E9E7F0;
+  --ring: #6C4CF1;
+  --radius: 0.85rem;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  scroll-behavior: smooth;
+  background: #ffffff;
+}
+
+body {
+  min-height: 100vh;
+  background: #ffffff;
+  color: #111827;
+  font-family: Geist, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@layer base {
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+::selection {
+  background: #e0e7ff;
+  color: #312e81;
+}
+
+/* Completely remove Next.js dev indicator / "N" floating tag */
+nextjs-portal,
+[data-nextjs-toast],
+[data-next-badge],
+[data-nextjs-dev-tools-button],
+button[aria-label*="Next.js"],
+div[data-nextjs-toast-wrapper],
+div[class*="next-badge"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}

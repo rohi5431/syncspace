@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: syncspace-api
+    metrics_path: /metrics
+    static_configs: [{ targets: ['api:3001'] }]
+  - job_name: syncspace-realtime
+    metrics_path: /metrics
+    static_configs: [{ targets: ['realtime-1:3002', 'realtime-2:3003'] }]

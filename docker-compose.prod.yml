@@ -1,0 +1,12 @@
+services:
+  web:
+    image: ${GHCR_OWNER:-local}/syncspace-web:${IMAGE_TAG:?IMAGE_TAG is required}
+    pull_policy: always
+  api:
+    image: ${GHCR_OWNER:-local}/syncspace-api:${IMAGE_TAG:?IMAGE_TAG is required}
+  realtime-1:
+    image: ${GHCR_OWNER:-local}/syncspace-realtime:${IMAGE_TAG:?IMAGE_TAG is required}
+  realtime-2:
+    image: ${GHCR_OWNER:-local}/syncspace-realtime:${IMAGE_TAG:?IMAGE_TAG is required}
+  worker:
+    image: ${GHCR_OWNER:-local}/syncspace-worker:${IMAGE_TAG:?IMAGE_TAG is required}

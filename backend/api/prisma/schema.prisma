@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String            @id @default(uuid())
+  email        String            @unique
+  passwordHash String
+  name         String
+  initials     String
+  tone         String            @default("indigo")
+  role         String            @default("MEMBER")
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  memberships  WorkspaceMember[]
+  documents    Document[]
+  activities   Activity[]
+  tokens       RefreshToken[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String            @id @default(uuid())
+  name        String
+  slug        String            @unique
+  ownerId     String
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  members     WorkspaceMember[]
+  documents   Document[]
+  projects    Project[]
+  folders     DocumentFolder[]
+  activities  Activity[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String    @id @default(uuid())
+  workspaceId String
+  userId      String
+  role        String    @default("MEMBER")
+  joinedAt    DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+model Document {
+  id          String    @id @default(uuid())
+  workspaceId String
+  projectId   String?
+  folderId    String?
+  title       String
+  category    String    @default("Team notes")
+  type        String    @default("TECHNICAL_DOCUMENTATION")
+  editor      String    @default("rich-text")
+  content     String    @default("")
+  starred     Boolean   @default(false)
+  authorId    String?
+  authorName  String
+  initials    String
+  tone        String    @default("indigo")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  folder      DocumentFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  author      User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  versions    DocumentVersion[]
+  comments    DocumentComment[]
+  permissions DocumentPermission[]
+  updates     DocumentUpdate[]
+
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([folderId])
+  @@map("documents")
+}
+
+model Project {
+  id          String    @id @default(uuid())
+  workspaceId String
+  title       String
+  description String    @default("")
+  progress    Int       @default(0)
+  dueDate     String    @default("No due date")
+  tone        String    @default("indigo")
+  members     String    @default("[]")
+  template    String    @default("web-application-development")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  documents   Document[]
+  sections    ProjectSection[]
+
+  @@index([workspaceId])
+  @@map("projects")
+}
+
+model ProjectSection {
+  id        String   @id @default(uuid())
+  projectId String
+  key       String
+  title     String
+  position  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, key])
+  @@index([projectId, position])
+  @@map("project_sections")
+}
+
+model DocumentFolder {
+  id          String   @id @default(uuid())
+  workspaceId String
+  name        String
+  parentId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parent    DocumentFolder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  DocumentFolder[] @relation("FolderTree")
+  documents Document[]
+
+  @@unique([workspaceId, parentId, name])
+  @@index([workspaceId])
+  @@map("document_folders")
+}
+
+model DocumentVersion {
+  id            String   @id @default(uuid())
+  documentId    String
+  content       String
+  contentFormat String   @default("html")
+  authorId      String?
+  authorName    String
+  createdAt     DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, createdAt])
+  @@map("document_versions")
+}
+
+model DocumentComment {
+  id         String   @id @default(uuid())
+  documentId String
+  content    String
+  anchor     String?
+  authorId   String?
+  authorName String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, createdAt])
+  @@map("document_comments")
+}
+
+model DocumentPermission {
+  id         String   @id @default(uuid())
+  documentId String
+  email      String
+  role       String   @default("VIEWER")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([documentId, email])
+  @@map("document_permissions")
+}
+
+model DocumentUpdate {
+  id         String   @id @default(uuid())
+  documentId String
+  update     Bytes
+  createdAt  DateTime @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId, createdAt])
+  @@map("document_updates")
+}
+
+model Task {
+  id          String    @id @default(uuid())
+  projectId   String
+  title       String
+  completed   Boolean   @default(false)
+  dueDate     String?
+  assignedTo  String?
+  priority    String    @default("MEDIUM")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("tasks")
+}
+
+model Activity {
+  id          String    @id @default(uuid())
+  workspaceId String
+  userId      String?
+  name        String
+  initials    String
+  tone        String    @default("indigo")
+  action      String
+  target      String
+  createdAt   DateTime  @default(now())
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId])
+  @@map("activities")
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid())
+  userId      String
+  tokenHash   String
+  expiresAt   DateTime
+  revoked     Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}

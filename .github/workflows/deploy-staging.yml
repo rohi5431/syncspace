@@ -1,0 +1,19 @@
+name: Deploy staging
+on:
+  workflow_run: { workflows: [CI], types: [completed], branches: [develop] }
+  workflow_dispatch:
+permissions: { contents: read, packages: read }
+concurrency: { group: staging, cancel-in-progress: false }
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy over SSH when configured
+        if: ${{ secrets.STAGING_HOST != '' }}
+        uses: appleboy/ssh-action@v1.2.0
+        with: { host: ${{ secrets.STAGING_HOST }}, username: ${{ secrets.STAGING_USER }}, key: ${{ secrets.STAGING_SSH_KEY }}, script: 'cd ${{ secrets.STAGING_PATH }} && IMAGE_TAG=sha-${{ github.sha }} ./scripts/deploy-staging.sh' }
+      - run: echo "Staging deployment skipped; configure STAGING_HOST, STAGING_USER, STAGING_SSH_KEY, and STAGING_PATH to enable it."
+        if: ${{ secrets.STAGING_HOST == '' }}
