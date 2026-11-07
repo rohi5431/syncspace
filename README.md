@@ -8,12 +8,6 @@
   A distributed collaboration platform that enables software development teams to collaboratively edit documents, manage projects, assign tasks, and communicate in real time through a unified workspace.
 </p>
 
-<p align="center">
-  <img width="1917" height="982" alt="image" src="https://github.com/user-attachments/assets/6d13f0c3-ca2a-40ff-81b5-f0a56de10ed0" />
-
-  
-</p>
-
 ---
 
 ## 📌 Table of Contents
@@ -147,6 +141,17 @@ The primary objectives of SyncSpace are:
 
 
 ---
+<p align="center">
+  <img width="1917" height="982" alt="image" src="https://github.com/user-attachments/assets/6d13f0c3-ca2a-40ff-81b5-f0a56de10ed0" />
+  <img width="1919" height="1023" alt="image" src="https://github.com/user-attachments/assets/c2f417af-2b82-4e0e-beea-0b28d6e1c105" />
+  <img width="1907" height="1017" alt="image" src="https://github.com/user-attachments/assets/01a5310d-0282-40ff-b4e5-0919298e8a57" />
+  <img width="1919" height="1028" alt="image" src="https://github.com/user-attachments/assets/41eb71f5-323d-4d02-a1aa-e0ade67210a1" />
+  <img width="1919" height="1029" alt="image" src="https://github.com/user-attachments/assets/5a82a9d2-874d-4e93-b995-fa28dbbd7e7d" />
+  <img width="1919" height="1027" alt="image" src="https://github.com/user-attachments/assets/65151b14-d30c-461c-8909-a5b5d8266254" />
+  <img width="1919" height="1027" alt="image" src="https://github.com/user-attachments/assets/6b74473a-dde3-40a3-a11e-b0106cf3f790" />
+  <img width="1918" height="1013" alt="image" src="https://github.com/user-attachments/assets/11258ec0-fa27-4dc5-b124-28abb60b5524" />
+  
+</p>
 
 ## 🏢 Multi-Tenant Organization Isolation
 
