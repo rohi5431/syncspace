@@ -9,13 +9,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=next.js&logoColor=white" />
-  <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" />
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
-  <img src="https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" />
-  <img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" />
-  <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" />
-  <img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
+  <img width="1917" height="982" alt="image" src="https://github.com/user-attachments/assets/6d13f0c3-ca2a-40ff-81b5-f0a56de10ed0" />
+
+  
 </p>
 
 ---
@@ -26,6 +22,7 @@
 - [Problem Statement](#-problem-statement)
 - [Our Solution](#-our-solution)
 - [Project Objectives](#-project-objectives)
+- [Multi-Tenant Organization Isolation](#-multi-tenant-organization-isolation)
 - [Core Features](#-core-features)
 - [System Architecture](#-system-architecture)
 - [Technology Stack](#-technology-stack)
@@ -37,6 +34,7 @@
 - [Authentication and Security](#-authentication-and-security)
 - [Background Job Processing](#-background-job-processing)
 - [Scalability and Reliability](#-scalability-and-reliability)
+- [Performance and Responsiveness](#-performance-and-responsiveness)
 - [CI/CD Pipeline](#-cicd-pipeline)
 - [Getting Started](#-getting-started)
 - [Environment Variables](#-environment-variables)
@@ -56,7 +54,7 @@ Modern development teams use multiple applications for document editing, project
 
 SyncSpace brings these collaboration capabilities into one unified workspace.
 
-Users can create workspaces, invite team members, collaboratively edit technical documents, manage software projects, assign tasks, track progress, and receive real-time updates.
+Organizations can use the same SyncSpace application while keeping their data isolated from other organizations. Within an organization, authorized users can create workspaces, invite team members, collaboratively edit technical documents, manage software projects, assign tasks, track progress, and receive real-time updates.
 
 The platform focuses on building a scalable and reliable collaborative environment using modern distributed systems concepts.
 
@@ -146,6 +144,160 @@ The primary objectives of SyncSpace are:
 8. Implement reliable background processing.
 9. Design a scalable architecture supporting multiple realtime server instances.
 10. Automate testing and integration through CI/CD.
+
+
+---
+
+## 🏢 Multi-Tenant Organization Isolation
+
+SyncSpace is designed as a **multi-tenant SaaS platform**. Multiple independent organizations use the same application and shared infrastructure, while each organization's data remains private to that organization.
+
+### Organization Hierarchy
+
+```text
+SyncSpace Platform
+│
+├── Organization A
+│   ├── Organization Members
+│   ├── Workspace 1
+│   │   ├── Projects
+│   │   ├── Teams
+│   │   ├── Tasks
+│   │   └── Documents
+│   └── Workspace 2
+│
+├── Organization B
+│   ├── Organization Members
+│   ├── Workspace 1
+│   │   ├── Projects
+│   │   ├── Teams
+│   │   ├── Tasks
+│   │   └── Documents
+│   └── Workspace 2
+│
+└── Platform Super Admin
+```
+
+Each organization manages its own members, workspaces, projects, teams, tasks, documents, invitations, and activity records. Organization A must never be able to read or modify Organization B's private resources.
+
+### Roles and Responsibilities
+
+| Role | Scope | Responsibilities |
+|---|---|---|
+| Platform Super Admin | Entire platform | Manage platform-level operations and organization accounts |
+| Organization Owner | One organization | Manage organization settings, administrators, members, and workspaces |
+| Organization Admin | One organization | Manage members, workspaces, teams, projects, and organization resources |
+| Workspace Admin | Assigned workspace | Manage workspace members and workspace-level resources |
+| Member | Authorized workspace/project | Use assigned projects, documents, and tasks according to permissions |
+
+A user may belong to more than one organization. The active organization context must be selected and validated for each request. Membership in one organization does not grant access to another organization.
+
+### Tenant Isolation Principles
+
+- Every tenant-owned resource must be associated with an organization.
+- Workspace, project, team, task, document, invitation, notification, and activity queries must be scoped to the authenticated user's authorized organization.
+- Never trust an `organizationId`, `workspaceId`, or `projectId` supplied by the browser without checking the user's membership and permissions.
+- Validate resource ownership and relationships on the backend for every read, create, update, delete, download, and realtime operation.
+- Use database constraints, including composite foreign keys where appropriate, to prevent records from referencing resources belonging to another organization.
+- Consider PostgreSQL Row-Level Security (RLS) as an additional defense-in-depth control where it fits the database access model.
+- Namespace Redis keys, cache entries, BullMQ job payloads, WebSocket rooms, and Yjs document identifiers with tenant context.
+- Check organization membership before allowing a user to join a collaborative document room or download a stored file.
+- Keep organization context in audit events so access and administrative actions can be traced.
+
+### Example: Independent Organization Data
+
+| Resource | Organization A | Organization B |
+|---|---|---|
+| Members | A's members only | B's members only |
+| Workspaces | A's workspaces | B's workspaces |
+| Projects | A's projects | B's projects |
+| Teams | A's teams | B's teams |
+| Documents and files | A's private data | B's private data |
+| Tasks and activity | A's records | B's records |
+
+Both organizations may use the same PostgreSQL cluster and application services. Logical isolation must be enforced by backend authorization and database safeguards; sharing infrastructure must not mean sharing tenant data.
+
+### Organization-Level Data Model
+
+The relational model should include organization ownership and membership:
+
+```mermaid
+erDiagram
+    ORGANIZATIONS ||--o{ ORGANIZATION_MEMBERS : has
+    USERS ||--o{ ORGANIZATION_MEMBERS : joins
+    ORGANIZATIONS ||--o{ WORKSPACES : owns
+    WORKSPACES ||--o{ WORKSPACE_MEMBERS : has
+    USERS ||--o{ WORKSPACE_MEMBERS : joins
+    WORKSPACES ||--o{ PROJECTS : contains
+    PROJECTS ||--o{ TEAMS : groups
+    PROJECTS ||--o{ TASKS : contains
+    ORGANIZATIONS ||--o{ INVITATIONS : issues
+
+    ORGANIZATIONS {
+        uuid id PK
+        string name
+        string slug
+        string status
+    }
+
+    ORGANIZATION_MEMBERS {
+        uuid id PK
+        uuid organization_id FK
+        uuid user_id FK
+        string role
+    }
+
+    WORKSPACES {
+        uuid id PK
+        uuid organization_id FK
+        string name
+        uuid owner_id FK
+    }
+
+    WORKSPACE_MEMBERS {
+        uuid id PK
+        uuid workspace_id FK
+        uuid user_id FK
+        string role
+    }
+
+    PROJECTS {
+        uuid id PK
+        uuid workspace_id FK
+        string name
+        string status
+    }
+
+    TEAMS {
+        uuid id PK
+        uuid project_id FK
+        string name
+    }
+
+    TASKS {
+        uuid id PK
+        uuid project_id FK
+        uuid assignee_id FK
+        string title
+        string status
+    }
+```
+
+This is a conceptual tenant-aware model. Adapt entity names and relationships to the actual Prisma schema and application implementation.
+
+### Organization Context in Requests
+
+A typical protected request should follow this sequence:
+
+1. Authenticate the user.
+2. Resolve the active organization from a validated session, membership, or request context.
+3. Verify that the user is an active member of that organization.
+4. Check the user's role and resource-level permissions.
+5. Execute a tenant-scoped database operation.
+6. Return only resources the user is authorized to access.
+
+Do not use frontend route separation as the security boundary. Admin and member dashboards are user-interface experiences; authorization must be enforced by the backend.
+
 
 ---
 
@@ -696,6 +848,17 @@ The backend exposes REST APIs for workspace management, projects, documents, tas
 | POST | `/api/auth/logout` | Logout user |
 | GET | `/api/auth/me` | Get current user |
 
+### Organizations
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/organizations` | Create organization |
+| GET | `/api/organizations` | List organizations the user belongs to |
+| GET | `/api/organizations/:id` | Get authorized organization |
+| PATCH | `/api/organizations/:id` | Update organization |
+| GET | `/api/organizations/:id/members` | List organization members |
+| POST | `/api/organizations/:id/invitations` | Invite organization member |
+
 ### Workspaces
 
 | Method | Endpoint | Description |
@@ -717,6 +880,16 @@ The backend exposes REST APIs for workspace management, projects, documents, tas
 | GET | `/api/projects/:id` | Get project |
 | PATCH | `/api/projects/:id` | Update project |
 | DELETE | `/api/projects/:id` | Delete project |
+
+### Teams
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/teams` | Create team |
+| GET | `/api/teams` | List authorized teams |
+| GET | `/api/teams/:id` | Get team |
+| PATCH | `/api/teams/:id` | Update team |
+| DELETE | `/api/teams/:id` | Delete team |
 
 ### Tasks
 
@@ -781,7 +954,10 @@ Role-based access control:
 
 ### Security Measures
 
-- Workspace-level data isolation.
+- Organization-level tenant isolation across all tenant-owned resources.
+- Workspace-level and project-level authorization.
+- Tenant-scoped database queries, cache keys, background jobs, and realtime rooms.
+- Cross-tenant access tests and database constraints where implemented.
 - Backend authorization on every protected resource.
 - Input validation and sanitization.
 - Secure invitation tokens.
@@ -887,6 +1063,85 @@ Shared authentication and application state are maintained through appropriate p
 
 Yjs CRDT manages concurrent collaborative document updates, while PostgreSQL transactions maintain consistency for relational business operations.
 
+
+---
+
+## ⚡ Performance and Responsiveness
+
+SyncSpace should provide immediate feedback to user interactions while keeping API operations, realtime synchronization, and background processing reliable.
+
+### Immediate Button Feedback
+
+A button should respond visually as soon as the user clicks it, even when the underlying server operation takes longer.
+
+- Show a pressed, loading, or pending state immediately after a valid interaction.
+- Disable submit actions while the same request is in progress to prevent accidental duplicate submissions.
+- Use optimistic UI updates only when the operation can be safely reconciled with the server response.
+- Show clear success and error feedback.
+- Restore or reconcile the UI when an operation fails.
+- Avoid full-page reloads for operations that can update local or server state incrementally.
+- Do not add artificial delays or fake success states.
+
+### Frontend Performance
+
+- Identify unnecessary React renders and optimize component state boundaries.
+- Avoid repeating identical API requests when existing query data can be reused safely.
+- Use pagination or virtualization for large project, task, member, and activity lists.
+- Debounce search and filter inputs where appropriate.
+- Lazy-load large editors and other expensive components when they are not immediately needed.
+- Keep expensive computation off the browser's main thread when it materially affects interaction responsiveness.
+- Provide accessible loading, disabled, success, and error states.
+
+### Backend and Database Performance
+
+- Measure API latency before optimizing.
+- Inspect slow endpoints, database query plans, N+1 queries, and repeated reads.
+- Add indexes based on observed query patterns.
+- Use pagination for large result sets.
+- Use connection pooling and bounded concurrency.
+- Run independent operations concurrently only when doing so is safe.
+- Cache frequently accessed data only with tenant-aware cache keys and an appropriate invalidation strategy.
+- Move non-interactive work such as email delivery and exports to BullMQ workers.
+
+### Realtime Performance
+
+- Avoid duplicate WebSocket event listeners and duplicate subscriptions.
+- Authenticate and authorize every realtime connection and document-room join.
+- Keep Yjs updates incremental rather than repeatedly transmitting complete document state.
+- Use Redis Pub/Sub for cross-instance event distribution, not as durable document storage.
+- Monitor active connections, message volume, update sizes, and persistence latency.
+- Apply backpressure or limits where needed to protect the realtime service.
+
+### Measurement and Targets
+
+Use measurements rather than assumptions to identify bottlenecks.
+
+| Measurement | Suggested target or practice |
+|---|---|
+| Click-to-visual-feedback | Aim for under 100 ms |
+| Lightweight API operations | Aim for under 500 ms where practical; measure p50 and p95 |
+| Page responsiveness | Track Core Web Vitals and interaction responsiveness |
+| Realtime synchronization | Measure update propagation and persistence latency |
+| Background jobs | Track queue wait time, processing time, retries, and failures |
+
+These are engineering targets, not guaranteed performance claims. Actual results depend on infrastructure, data volume, network conditions, and concurrent usage.
+
+### Performance Validation
+
+Test representative user journeys, including:
+
+- Creating an organization and workspace.
+- Creating projects and teams.
+- Inviting members.
+- Creating and assigning tasks.
+- Searching and filtering large lists.
+- Opening and editing collaborative documents.
+- Receiving realtime updates from another user.
+- Uploading and downloading attachments.
+
+Use browser performance tools, backend timing logs, and automated browser tests where configured. Record before-and-after measurements for optimizations and avoid claiming improvements that have not been measured.
+
+
 ---
 
 ## 🔄 CI/CD Pipeline
@@ -918,6 +1173,9 @@ flowchart TD
 - Unit testing.
 - Integration testing.
 - Application builds.
+- Tenant-isolation tests for organization, workspace, project, file, and realtime access where implemented.
+- Frontend interaction and performance checks where configured.
+- Docker configuration and image-build validation where configured.
 
 The initial pipeline focuses on continuous integration and automated quality checks. Deployment automation can be added separately when a production hosting environment is selected.
 
@@ -1069,6 +1327,9 @@ Use Playwright to validate complete user workflows:
 8. Verify synchronization.
 9. Reconnect after temporary network disconnection.
 10. Verify document persistence.
+11. Create two separate organizations and verify that their data remains isolated.
+12. Attempt cross-organization access to workspaces, projects, tasks, documents, and files and verify that access is denied.
+13. Verify that buttons provide immediate loading or interaction feedback and prevent duplicate submissions.
 
 ---
 
@@ -1076,6 +1337,9 @@ Use Playwright to validate complete user workflows:
 
 Potential improvements for future releases:
 
+- [ ] Advanced organization-level administration and audit controls.
+- [ ] Automated tenant-isolation security test suite.
+- [ ] Performance benchmarking under realistic multi-organization concurrency.
 - [ ] Advanced document permissions.
 - [ ] Rich document templates.
 - [ ] Advanced search across workspaces.
