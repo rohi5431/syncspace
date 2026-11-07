@@ -150,7 +150,10 @@ The primary objectives of SyncSpace are:
   <img width="1919" height="1027" alt="image" src="https://github.com/user-attachments/assets/65151b14-d30c-461c-8909-a5b5d8266254" />
   <img width="1919" height="1027" alt="image" src="https://github.com/user-attachments/assets/6b74473a-dde3-40a3-a11e-b0106cf3f790" />
   <img width="1918" height="1013" alt="image" src="https://github.com/user-attachments/assets/11258ec0-fa27-4dc5-b124-28abb60b5524" />
-  
+  <img width="1919" height="1026" alt="image" src="https://github.com/user-attachments/assets/b4a3910a-df6a-43e9-9a3a-90aafdf681cb" />
+  <img width="1919" height="1026" alt="image" src="https://github.com/user-attachments/assets/1247cf86-0adb-4c61-84ea-2c1e95a4de73" />
+  <img width="1919" height="1030" alt="image" src="https://github.com/user-attachments/assets/5355bb0d-5045-4f46-a617-2c4c57a07ac8" />
+
 </p>
 
 ## 🏢 Multi-Tenant Organization Isolation
