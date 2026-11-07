@@ -14,7 +14,7 @@
     "docker:build": "./scripts/docker-build.sh"
   },
   "dependencies": {
-    "@base-ui/react": "^1.5.0",
+    "@base-ui/react": "^1.9.0",
     "@hookform/resolvers": "^7.0.3",
     "@tiptap/extension-collaboration": "^3.32.3",
     "@tiptap/react": "^3.32.3",
