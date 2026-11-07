@@ -14,6 +14,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Settings2,
+  ShieldCheck,
   Sparkles,
   Users2,
   X,
@@ -56,6 +57,7 @@ export function AppSidebar({
     tone: 'indigo' as const,
     plan: 'Pro Plan',
   })
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false)
 
   useEffect(() => {
     try {
@@ -69,6 +71,7 @@ export function AppSidebar({
           tone: (parsed.tone || 'indigo') as any,
           plan: 'Pro Plan',
         })
+        setIsPlatformAdmin(parsed.platformRole === 'ADMIN')
       }
     } catch {
       // fallback
@@ -205,6 +208,30 @@ export function AppSidebar({
             )
           })}
         </div>
+        {isPlatformAdmin && (
+          <div className="mt-5 border-t border-gray-100 pt-4">
+            {!isCollapsed && (
+              <p className="mb-2 px-3 text-[11px] font-extrabold uppercase tracking-wider text-gray-400">
+                Platform
+              </p>
+            )}
+            <Link
+              href="/admin"
+              onClick={onClose}
+              title={isCollapsed ? 'Platform admin' : undefined}
+              className={`group flex items-center rounded-xl font-semibold transition-all ${
+                isCollapsed ? 'size-11 justify-center mx-auto' : 'h-10 px-3.5 text-sm'
+              } ${
+                pathname.startsWith('/admin')
+                  ? 'bg-[#6C4CF1] text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-[#F7F5FF] hover:text-[#6C4CF1]'
+              }`}
+            >
+              <ShieldCheck className="size-4.5 shrink-0" />
+              {!isCollapsed && <span className="ml-3 truncate">Platform admin</span>}
+            </Link>
+          </div>
+        )}
 
         {/* Favorites section (matching reference screenshot) */}
         {!isCollapsed ? (

@@ -10,12 +10,16 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  UseGuards,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
 import { Response } from 'express'
 import { StorageService } from './storage.service'
 import { memoryStorage } from 'multer'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { WorkspaceMembershipGuard } from '../auth/workspace-membership.guard'
 
+@UseGuards(JwtAuthGuard, WorkspaceMembershipGuard)
 @Controller('api/documents/:documentId/files')
 export class StorageController {
   private readonly logger = new Logger(StorageController.name)

@@ -28,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { UserAvatar } from '@/components/dashboard/user-avatar'
 import { useToast } from '@/components/providers/toast-provider'
+import { apiFetch } from '@/lib/api-client'
 import {
   CreateDocumentDialog,
   RenameDocumentDialog,
@@ -38,6 +39,7 @@ import { DocumentWorkspaceEditor } from './document-workspace-editor'
 
 export function DocumentsManager() {
   const [documents, setDocuments] = useState<DocumentSummary[]>([])
+  const [updatingStars, setUpdatingStars] = useState<Set<string>>(() => new Set())
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])
   const [workspaceId, setWorkspaceId] = useState('')
   const [loading, setLoading] = useState(true)
@@ -65,7 +67,7 @@ export function DocumentsManager() {
 
   useEffect(() => {
     let active = true
-    fetch('/api/dashboard/summary')
+    apiFetch('/api/dashboard/summary')
       .then(async (response) => {
         if (!response.ok) throw new Error(await response.text() || 'Unable to load workspace')
         return response.json()
@@ -75,7 +77,7 @@ export function DocumentsManager() {
         if (!id) throw new Error('No workspace is available')
         if (!active) return
         setWorkspaceId(id)
-        const response = await fetch(`/api/documents/folders?workspaceId=${encodeURIComponent(id)}`)
+        const response = await apiFetch(`/api/documents/folders?workspaceId=${encodeURIComponent(id)}`)
         if (!response.ok) throw new Error(await response.text() || 'Unable to load folders')
         const loadedFolders: Array<{ id: string; name: string }> = await response.json()
         if (active) setFolders(loadedFolders)
@@ -91,7 +93,10 @@ export function DocumentsManager() {
     const timer = window.setTimeout(async () => {
       try {
         const query = searchQuery.trim()
-        const response = await fetch(`/api/documents${query ? `?q=${encodeURIComponent(query)}` : ''}`)
+        if (!workspaceId) return
+        const params = new URLSearchParams({ workspaceId })
+        if (query) params.set('q', query)
+        const response = await apiFetch(`/api/documents?${params}`)
         if (!response.ok) throw new Error(await response.text() || 'Unable to load documents')
         const items: Array<Record<string, unknown>> = await response.json()
         if (!active) return
@@ -129,7 +134,7 @@ export function DocumentsManager() {
       active = false
       window.clearTimeout(timer)
     }
-  }, [searchQuery])
+  }, [searchQuery, workspaceId])
 
   // Filter & Search logic
   const filtered = useMemo(() => {
@@ -158,23 +163,32 @@ export function DocumentsManager() {
 
   const toggleStar = async (id: string) => {
     const document = documents.find((item) => item.id === id)
-    if (!document) return
+    if (!document || updatingStars.has(id)) return
+    const starred = !document.starred
+    setUpdatingStars((previous) => new Set(previous).add(id))
+    setDocuments((previous) => previous.map((item) => item.id === id ? { ...item, starred } : item))
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(id)}`, {
+      const response = await apiFetch(`/api/documents/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ starred: !document.starred }),
+        body: JSON.stringify({ starred }),
       })
       if (!response.ok) throw new Error(await response.text() || 'Unable to update document')
-      setDocuments((prev) => prev.map((item) => item.id === id ? { ...item, starred: !document.starred } : item))
     } catch (error) {
+      setDocuments((previous) => previous.map((item) => item.id === id ? { ...item, starred: document.starred } : item))
       toast(error instanceof Error ? error.message : 'Unable to update document')
+    } finally {
+      setUpdatingStars((previous) => {
+        const next = new Set(previous)
+        next.delete(id)
+        return next
+      })
     }
   }
 
   const handleDelete = async (id: string, title: string) => {
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      const response = await apiFetch(`/api/documents/${encodeURIComponent(id)}`, { method: 'DELETE' })
       if (!response.ok) throw new Error(await response.text() || 'Unable to delete document')
       setDocuments((prev) => prev.filter((document) => document.id !== id))
       toast(`“${title}” was deleted.`)
@@ -185,7 +199,7 @@ export function DocumentsManager() {
 
   const handleDuplicate = async (doc: DocumentSummary) => {
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(doc.id)}/duplicate`, { method: 'POST' })
+      const response = await apiFetch(`/api/documents/${encodeURIComponent(doc.id)}/duplicate`, { method: 'POST' })
       if (!response.ok) throw new Error(await response.text() || 'Unable to duplicate document')
       const duplicate = await response.json()
       setDocuments((prev) => [{
@@ -205,7 +219,7 @@ export function DocumentsManager() {
     event.preventDefault()
     if (!workspaceId || !newFolderName.trim()) return
     try {
-      const response = await fetch('/api/documents/folders', {
+      const response = await apiFetch('/api/documents/folders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workspaceId, name: newFolderName.trim() }),
@@ -394,6 +408,8 @@ export function DocumentsManager() {
                       <button
                         type="button"
                         onClick={() => toggleStar(doc.id)}
+                        disabled={updatingStars.has(doc.id)}
+                        aria-pressed={doc.starred}
                         className={`rounded-lg p-1.5 transition ${
                           doc.starred ? 'text-amber-500' : 'text-gray-300 hover:text-amber-500'
                         }`}
@@ -535,6 +551,8 @@ export function DocumentsManager() {
                         <button
                           type="button"
                           onClick={() => toggleStar(doc.id)}
+                          disabled={updatingStars.has(doc.id)}
+                          aria-pressed={doc.starred}
                           className={`transition ${doc.starred ? 'text-amber-500' : 'text-gray-300 hover:text-amber-500'}`}
                         >
                           <Star className={`size-4.5 ${doc.starred ? 'fill-amber-400' : ''}`} />
@@ -718,7 +736,7 @@ export function DocumentsManager() {
           onClose={() => setRenameDoc(null)}
           currentTitle={renameDoc.title}
           onRename={(newTitle) => {
-            void fetch(`/api/documents/${encodeURIComponent(renameDoc.id)}`, {
+            void apiFetch(`/api/documents/${encodeURIComponent(renameDoc.id)}`, {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ title: newTitle }),

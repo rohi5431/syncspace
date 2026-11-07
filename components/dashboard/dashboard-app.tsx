@@ -27,6 +27,7 @@ import {
   ShareDocumentDialog,
 } from './create-dialogs'
 import { useToast } from '@/components/providers/toast-provider'
+import { apiFetch } from '@/lib/api-client'
 import type { DashboardData, DocumentSummary, ProjectSummary, TaskSummary } from './dashboard-types'
 
 // Default fallback data matching seeded database
@@ -363,7 +364,7 @@ export function DashboardApp() {
 
     const fetchSummary = async () => {
       try {
-        const res = await fetch('/api/dashboard/summary')
+        const res = await apiFetch('/api/dashboard/summary')
         if (res.ok) {
           const json = await res.json()
           if (json && json.stats) {
@@ -493,16 +494,25 @@ export function DashboardApp() {
   }
 
   // Workspace actions
-  const handleCreateWorkspace = (name: string) => {
+  const handleCreateWorkspace = (workspace: { id: string; name: string; slug: string }) => {
+    localStorage.setItem('syncspace_workspace', JSON.stringify(workspace))
     setData((prev) => ({
       ...prev,
       workspace: {
         ...prev.workspace,
-        name,
-        slug: name.toLowerCase().replace(/\s+/g, '-'),
+        ...workspace,
       },
     }))
-    toast(`Workspace “${name}” is now active.`)
+    apiFetch(`/api/dashboard/summary?workspace=${encodeURIComponent(workspace.id)}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await response.text() || 'Unable to load the new workspace')
+        return response.json()
+      })
+      .then((summary: DashboardData) => setData((previous) => ({ ...previous, ...summary })))
+      .catch((error: unknown) => {
+        toast(error instanceof Error ? `Workspace created, but its summary could not be loaded: ${error.message}` : 'Workspace created, but its summary could not be loaded.')
+      })
+    toast(`Workspace “${workspace.name}” is now active.`)
   }
 
   // Member invite action
@@ -679,18 +689,22 @@ export function DashboardApp() {
         open={documentOpen}
         onClose={() => setDocumentOpen(false)}
         onCreate={handleCreateDocument}
+        workspaceId={data.workspace.id}
       />
 
       <CreateProjectDialog
         open={projectOpen}
         onClose={() => setProjectOpen(false)}
         onCreate={handleCreateProject}
+        workspaceId={data.workspace.id}
       />
 
       <CreateTaskDialog
         open={taskOpen}
         onClose={() => setTaskOpen(false)}
         onCreate={handleCreateTask}
+        projects={data.projects}
+        teamMembers={data.teamMembers}
       />
 
       <CreateWorkspaceDialog

@@ -1,43 +1,211 @@
 name: CI
+
 on:
-  push: { branches: [main, develop] }
-  pull_request: { branches: [main] }
-concurrency: { group: ci-${{ github.ref }}, cancel-in-progress: true }
-permissions: { contents: read }
-env: { NODE_VERSION: '22' }
+  push:
+    branches:
+      - main
+      - development
+  pull_request:
+    branches:
+      - main
+      - development
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '12.3.4'
+
 jobs:
-  frontend:
+  code-quality:
+    name: Code quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 12.3.4 }
-      - uses: actions/setup-node@v4
-        with: { node-version: ${{ env.NODE_VERSION }}, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec tsc --noEmit
-      - run: pnpm build
-  backend:
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        run: pnpm lint
+
+      - name: Type-check frontend
+        run: pnpm typecheck
+
+  backend-tests:
+    name: Backend tests and database validation
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('backend/api/package.json') != '' }}
+    timeout-minutes: 20
     services:
-      postgres: { image: postgres:16, env: { POSTGRES_PASSWORD: test, POSTGRES_DB: syncspace_test }, ports: ['5432:5432'], options: >-\n        --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5 }
-      redis: { image: redis:7, ports: ['6379:6379'] }
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: syncspace
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: syncspace_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U syncspace -d syncspace_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://syncspace:ci-only-password@localhost:5432/syncspace_test
+      JWT_ACCESS_SECRET: ci-only-access-secret
+      JWT_REFRESH_SECRET: ci-only-refresh-secret
+      REDIS_URL: redis://localhost:6379
+      MONGODB_URI: ''
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 12.3.4 }
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --dir backend/api exec prisma migrate deploy
-        env: { DATABASE_URL: postgresql://postgres:test@localhost:5432/syncspace_test }
-      - run: pnpm --dir backend/api test --if-present
-      - run: pnpm --dir backend/api build
-  required:
-    if: always()
-    needs: [frontend, backend]
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply Prisma migrations to CI PostgreSQL
+        run: pnpm --dir backend/api exec prisma migrate deploy
+
+      - name: Run API unit tests
+        run: pnpm --dir backend/api test --runInBand
+
+      - name: Run realtime unit tests
+        run: pnpm --dir backend/realtime test --runInBand
+
+      - name: Run worker unit tests
+        run: pnpm --dir backend/worker test --runInBand
+
+  frontend-tests:
+    name: Frontend build and browser tests
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: postgresql://syncspace:ci-only-password@localhost:5432/syncspace_test
+      JWT_ACCESS_SECRET: ci-only-access-secret
+      JWT_REFRESH_SECRET: ci-only-refresh-secret
+      NEXT_PUBLIC_REALTIME_URL: http://localhost:3002
     steps:
-      - run: test "${{ needs.frontend.result }}" = success && (test "${{ needs.backend.result }}" = success || test "${{ needs.backend.result }}" = skipped)
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Next.js application
+        run: pnpm build
+
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run end-to-end smoke tests
+        run: pnpm test:e2e
+
+  backend-build:
+    name: Backend production builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://syncspace:ci-only-password@localhost:5432/syncspace_test
+      JWT_ACCESS_SECRET: ci-only-access-secret
+      JWT_REFRESH_SECRET: ci-only-refresh-secret
+      REDIS_URL: redis://localhost:6379
+      MONGODB_URI: ''
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4.1.0
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build API
+        run: pnpm --dir backend/api build
+
+      - name: Build realtime service
+        run: pnpm --dir backend/realtime build
+
+      - name: Build worker
+        run: pnpm --dir backend/worker build
+
+  docker-validation:
+    name: Docker and Compose validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: frontend
+            context: .
+            dockerfile: Dockerfile
+          - service: api
+            context: backend/api
+            dockerfile: docker/Dockerfile.service
+          - service: realtime
+            context: backend/realtime
+            dockerfile: docker/Dockerfile.service
+          - service: worker
+            context: backend/worker
+            dockerfile: docker/Dockerfile.service
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4.2.2
+
+      - name: Create local-only Compose environment file
+        run: cp .env.development.example .env.development
+
+      - name: Validate development Compose configuration
+        run: docker compose -f docker-compose.yml -f docker-compose.dev.yml config --quiet
+
+      - name: Build Docker image without pushing
+        run: docker build --file "${{ matrix.dockerfile }}" --tag "syncspace-${{ matrix.service }}:ci" "${{ matrix.context }}"

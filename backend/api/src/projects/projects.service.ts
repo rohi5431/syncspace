@@ -4,11 +4,6 @@ import { PrismaService } from '../prisma/prisma.service'
 import { RedisService } from '../redis/redis.service'
 import { CreateProjectDto, PROJECT_SECTIONS, UpdateProjectDto } from './dto/project.dto'
 
-interface ProjectActor {
-  id?: string
-  initials?: string
-}
-
 @Injectable()
 export class ProjectsService {
   constructor(
@@ -16,9 +11,12 @@ export class ProjectsService {
     private readonly redis: RedisService,
   ) {}
 
-  async findAll(workspaceId?: string) {
+  async findAll(userId: string, workspaceId?: string) {
     const projects = await this.prisma.project.findMany({
-      where: workspaceId ? { workspaceId } : undefined,
+      where: {
+        workspaceId,
+        workspace: { isSuspended: false, members: { some: { userId } } },
+      },
       include: { tasks: true, sections: { orderBy: { position: 'asc' } } },
       orderBy: { updatedAt: 'desc' },
     })
@@ -28,9 +26,9 @@ export class ProjectsService {
     }))
   }
 
-  async findOne(id: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { id },
+  async findOne(id: string, userId: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { id, workspace: { isSuspended: false, members: { some: { userId } } } },
       include: {
         tasks: true,
         sections: { orderBy: { position: 'asc' } },
@@ -44,13 +42,21 @@ export class ProjectsService {
     }
   }
 
-  async create(dto: CreateProjectDto, user?: ProjectActor) {
-    const workspace = dto.workspaceId
-      ? await this.prisma.workspace.findUnique({ where: { id: dto.workspaceId } })
-      : await this.prisma.workspace.findFirst()
+  async create(dto: CreateProjectDto, userId: string) {
+    const membership = await this.prisma.workspaceMember.findFirst({
+      where: {
+        userId,
+        role: { in: ['OWNER', 'ADMIN'] },
+        workspace: { isSuspended: false },
+        ...(dto.workspaceId ? { workspaceId: dto.workspaceId } : {}),
+      },
+      include: { workspace: true },
+      orderBy: { joinedAt: 'asc' },
+    })
+    const workspace = membership?.workspace
     if (!workspace) throw new NotFoundException('A workspace is required to create a project')
 
-    const members = dto.members ?? (user?.initials ? [user.initials] : [])
+    const members = dto.members ?? []
     const project = await this.prisma.$transaction(async (transaction) => {
       const created = await transaction.project.create({
         data: {
@@ -85,13 +91,15 @@ export class ProjectsService {
     const result = { ...project, members: JSON.parse(project.members || '[]') as string[] }
     await this.redis.publish('syncspace:events', {
       type: 'project:created',
-      payload: result,
+      payload: { ...result, workspaceId: workspace.id },
     })
     return result
   }
 
-  async update(id: string, dto: UpdateProjectDto) {
-    const current = await this.prisma.project.findUnique({ where: { id } })
+  async update(id: string, dto: UpdateProjectDto, userId: string) {
+    const current = await this.prisma.project.findFirst({
+      where: { id, workspace: { isSuspended: false, members: { some: { userId, role: { in: ['OWNER', 'ADMIN'] } } } } },
+    })
     if (!current) throw new NotFoundException(`Project ${id} was not found`)
     const updated = await this.prisma.project.update({
       where: { id },
@@ -104,18 +112,21 @@ export class ProjectsService {
     const result = { ...updated, members: JSON.parse(updated.members || '[]') as string[] }
     await this.redis.publish('syncspace:events', {
       type: 'project:updated',
-      payload: result,
+      payload: { ...result, workspaceId: current.workspaceId },
     })
     return result
   }
 
-  async remove(id: string) {
-    const project = await this.prisma.project.findUnique({ where: { id }, select: { id: true } })
+  async remove(id: string, userId: string) {
+    const project = await this.prisma.project.findFirst({
+      where: { id, workspace: { isSuspended: false, members: { some: { userId, role: { in: ['OWNER', 'ADMIN'] } } } } },
+      select: { id: true, workspaceId: true },
+    })
     if (!project) throw new NotFoundException(`Project ${id} was not found`)
     await this.prisma.project.delete({ where: { id } })
     await this.redis.publish('syncspace:events', {
       type: 'project:deleted',
-      payload: { id },
+      payload: { id, workspaceId: project.workspaceId },
     })
     return { success: true, id }
   }

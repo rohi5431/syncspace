@@ -7,6 +7,7 @@
     "start": "node dist/main.js",
     "start:dev": "tsc -p tsconfig.build.json -w",
     "test": "jest --passWithNoTests",
+    "seed": "tsc --target ES2022 --module commonjs --moduleResolution node --esModuleInterop --skipLibCheck --types node --outDir .seed-build prisma/seed.ts && node .seed-build/seed.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate deploy"
   },

@@ -17,8 +17,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { UserAvatar } from '@/components/dashboard/user-avatar'
 import { useToast } from '@/components/providers/toast-provider'
+import { apiFetch } from '@/lib/api-client'
 import { CreateDocumentDialog, CreateTaskDialog } from '@/components/dashboard/create-dialogs'
-import type { DocumentSummary, ProjectSummary, TaskSummary } from '@/components/dashboard/dashboard-types'
+import type { DocumentSummary, ProjectSummary, TaskSummary, TeamMemberSummary } from '@/components/dashboard/dashboard-types'
 
 interface ProjectDetailProps {
   projectId: string
@@ -31,26 +32,45 @@ interface ProjectRecord extends ProjectSummary {
   updatedAt: string
 }
 
+type ProjectWithTasks = ProjectRecord & {
+  tasks: Array<{
+    id: string
+    title: string
+    completed: boolean
+    dueDate: string | null
+    assignedTo: string | null
+    priority: string
+  }>
+}
+
 export function ProjectDetailView({ projectId }: ProjectDetailProps) {
   const [project, setProject] = useState<ProjectRecord | null>(null)
   const [tasks, setTasks] = useState<TaskSummary[]>([])
+  const [teamMembers, setTeamMembers] = useState<TeamMemberSummary[]>([])
   const [activeSection, setActiveSection] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
+  const [updatingTaskIds, setUpdatingTaskIds] = useState<Set<string>>(() => new Set())
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
   const [createDocumentOpen, setCreateDocumentOpen] = useState(false)
   const toast = useToast()
 
   useEffect(() => {
     let active = true
-    fetch(`/api/projects/${encodeURIComponent(projectId)}`)
-      .then(async (response) => {
-        if (!response.ok) throw new Error(await response.text() || 'Unable to load project')
-        return response.json()
+    Promise.all([
+      apiFetch(`/api/projects/${encodeURIComponent(projectId)}`),
+      apiFetch('/api/dashboard/summary'),
+    ])
+      .then(async ([projectResponse, summaryResponse]) => {
+        if (!projectResponse.ok) throw new Error(await projectResponse.text() || 'Unable to load project')
+        if (!summaryResponse.ok) throw new Error(await summaryResponse.text() || 'Unable to load workspace members')
+        return Promise.all([projectResponse.json(), summaryResponse.json()])
       })
-      .then((record: ProjectRecord & { tasks: Array<{ id: string; title: string; completed: boolean; dueDate: string | null; assignedTo: string | null; priority: string }> }) => {
+      .then(([record, summary]: [ProjectWithTasks, { teamMembers?: TeamMemberSummary[] }]) => {
         if (!active) return
+        const members = summary.teamMembers ?? []
         setProject(record)
+        setTeamMembers(members)
         setTasks(record.tasks.map((task) => ({
           id: task.id,
           title: task.title,
@@ -60,8 +80,8 @@ export function ProjectDetailView({ projectId }: ProjectDetailProps) {
           dueDate: task.dueDate ?? 'No due date',
           priority: task.priority === 'HIGH' ? 'High' : task.priority === 'LOW' ? 'Low' : 'Medium',
           assignee: {
-            name: task.assignedTo ?? 'Unassigned',
-            initials: task.assignedTo ?? '--',
+            name: members.find((member) => member.id === task.assignedTo)?.name ?? 'Unassigned',
+            initials: members.find((member) => member.id === task.assignedTo)?.initials ?? '--',
           },
         })))
       })
@@ -79,17 +99,26 @@ export function ProjectDetailView({ projectId }: ProjectDetailProps) {
 
   const toggleTask = async (id: string) => {
     const task = tasks.find((item) => item.id === id)
-    if (!task) return
+    if (!task || updatingTaskIds.has(id)) return
+    const completed = !task.completed
+    setUpdatingTaskIds((previous) => new Set(previous).add(id))
+    setTasks((previous) => previous.map((item) => item.id === id ? { ...item, completed } : item))
     try {
-      const response = await fetch(`/api/tasks/${encodeURIComponent(id)}`, {
+      const response = await apiFetch(`/api/tasks/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ completed: !task.completed }),
+        body: JSON.stringify({ completed }),
       })
       if (!response.ok) throw new Error(await response.text() || 'Unable to update task')
-      setTasks((previous) => previous.map((item) => item.id === id ? { ...item, completed: !task.completed } : item))
     } catch (error) {
+      setTasks((previous) => previous.map((item) => item.id === id ? { ...item, completed: task.completed } : item))
       toast(error instanceof Error ? error.message : 'Unable to update task')
+    } finally {
+      setUpdatingTaskIds((previous) => {
+        const next = new Set(previous)
+        next.delete(id)
+        return next
+      })
     }
   }
 
@@ -100,7 +129,7 @@ export function ProjectDetailView({ projectId }: ProjectDetailProps) {
 
   const updateProject = async (updates: Partial<ProjectRecord>) => {
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}`, {
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(projectId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -239,6 +268,9 @@ export function ProjectDetailView({ projectId }: ProjectDetailProps) {
                   <button
                     type="button"
                     onClick={() => toggleTask(task.id)}
+                    disabled={updatingTaskIds.has(task.id)}
+                    aria-label={`Mark task ${task.title} ${task.completed ? 'incomplete' : 'complete'}`}
+                    aria-pressed={task.completed}
                     className={`grid size-6 shrink-0 place-items-center rounded-lg border transition ${
                       task.completed
                         ? 'border-[#16A34A] bg-[#16A34A] text-white'
@@ -326,6 +358,8 @@ export function ProjectDetailView({ projectId }: ProjectDetailProps) {
         onClose={() => setCreateTaskOpen(false)}
         onCreate={handleCreateTask}
         projectId={projectId}
+        projects={project ? [project] : []}
+        teamMembers={teamMembers}
       />
       <CreateDocumentDialog
         open={createDocumentOpen}

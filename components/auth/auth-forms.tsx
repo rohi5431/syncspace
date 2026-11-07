@@ -163,9 +163,9 @@ function AuthShell({
             <div className="mb-5 rounded-xl border border-indigo-100 bg-indigo-50/80 p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold text-indigo-900">⚡ Demo Account</p>
+                  <p className="text-xs font-bold text-indigo-900">⚡ Admin Demo Account</p>
                   <p className="mt-0.5 font-mono text-xs text-indigo-600">
-                    rohit@northstar.co · syncspace123
+                    maya@northstar.co · syncspace123
                   </p>
                 </div>
                 <button
@@ -207,6 +207,7 @@ function AuthShell({
 // ─── Signup Form ──────────────────────────────────────────────────────────────
 
 export function SignupForm() {
+  const router = useRouter()
   const toast = useToast()
   const [loading, setLoading] = useState(false)
   const [showNote, setShowNote] = useState(false)
@@ -243,7 +244,7 @@ export function SignupForm() {
         document.cookie = `syncspace_session=true; path=/; max-age=86400; SameSite=Lax`
 
         toast(`Account created for ${values.fullName.trim()}! Redirecting to workspace...`)
-        setTimeout(() => { window.location.href = '/dashboard' }, 600)
+        router.replace(data.user?.platformRole === 'ADMIN' ? '/admin' : '/dashboard')
         return
       }
 
@@ -253,23 +254,9 @@ export function SignupForm() {
           ? data.message.join(', ')
           : data.message || 'Registration failed. This email may already be in use.'
       toast(message)
-    } catch (err: any) {
-      // 🔌 Network / backend offline → resilient demo fallback
-      console.warn('Backend unreachable, using demo fallback:', err.message)
-      const demoUser = {
-        id: `usr-${Date.now().toString(36)}`,
-        name: values.fullName.trim(),
-        email: values.email.toLowerCase().trim(),
-        initials: values.fullName.slice(0, 2).toUpperCase(),
-        tone: 'indigo',
-        role: 'OWNER',
-      }
-      localStorage.setItem('syncspace_user', JSON.stringify(demoUser))
-      localStorage.setItem('syncspace_token', 'demo-token-' + Date.now())
-      document.cookie = `syncspace_session=true; path=/; max-age=86400; SameSite=Lax`
-
-      toast(`Welcome, ${values.fullName.trim()}! (Demo mode — backend offline)`)
-      setTimeout(() => { window.location.href = '/dashboard' }, 600)
+    } catch (err: unknown) {
+      console.error('Registration request failed:', err)
+      toast('Unable to reach the server. Please try again when the service is available.')
     } finally {
       setLoading(false)
     }
@@ -388,6 +375,7 @@ export function SignupForm() {
 // ─── Login Form ───────────────────────────────────────────────────────────────
 
 export function LoginForm() {
+  const router = useRouter()
   const toast = useToast()
   const [loading, setLoading] = useState(false)
 
@@ -397,9 +385,9 @@ export function LoginForm() {
   })
 
   const fillDemoAccount = () => {
-    form.setValue('email', 'rohit@northstar.co')
+    form.setValue('email', 'maya@northstar.co')
     form.setValue('password', 'syncspace123')
-    toast('Demo credentials filled! Click "Sign in" to continue.')
+    toast('Admin demo credentials filled! Click "Sign in" to continue.')
   }
 
   const onSubmit = async (values: LoginFormValues) => {
@@ -427,7 +415,7 @@ export function LoginForm() {
         document.cookie = `syncspace_session=true; path=/; max-age=86400; SameSite=Lax`
 
         toast(`Welcome back, ${data.user?.name || 'there'}! Redirecting…`)
-        setTimeout(() => { window.location.href = '/dashboard' }, 500)
+        router.replace(data.user?.platformRole === 'ADMIN' ? '/admin' : '/dashboard')
         return
       }
 
@@ -437,23 +425,9 @@ export function LoginForm() {
           ? data.message.join(', ')
           : data.message || 'Invalid email or password. Please try again.'
       toast(message)
-    } catch (err: any) {
-      // 🔌 Backend unreachable → demo fallback
-      console.warn('Backend unreachable, using demo fallback:', err.message)
-      const demoUser = {
-        id: 'usr-rohit',
-        name: values.email.includes('rohit') ? 'Rohit Kumar' : values.email.split('@')[0],
-        email: values.email,
-        initials: values.email.slice(0, 2).toUpperCase(),
-        tone: 'slate',
-        role: 'OWNER',
-      }
-      localStorage.setItem('syncspace_user', JSON.stringify(demoUser))
-      localStorage.setItem('syncspace_token', 'demo-token-' + Date.now())
-      document.cookie = `syncspace_session=true; path=/; max-age=86400; SameSite=Lax`
-
-      toast(`Signed in as ${values.email} (Demo mode — backend offline)`)
-      setTimeout(() => { window.location.href = '/dashboard' }, 500)
+    } catch (err: unknown) {
+      console.error('Login request failed:', err)
+      toast('Unable to reach the server. Please try again when the service is available.')
     } finally {
       setLoading(false)
     }
@@ -478,7 +452,7 @@ export function LoginForm() {
           id="email"
           label="Email address"
           type="email"
-          placeholder="rohit@northstar.co"
+          placeholder="maya@northstar.co"
           autoComplete="email"
           register={form.register}
           error={form.formState.errors.email?.message}

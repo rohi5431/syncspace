@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { Injectable, Logger, NotFoundException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 
 @Injectable()
@@ -7,13 +7,18 @@ export class DashboardService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getSummary(workspaceSlugOrId?: string) {
+  async getSummary(userId: string, workspaceSlugOrId?: string) {
     try {
-      // Find workspace
-      let workspace = await this.prisma.workspace.findFirst({
-        where: workspaceSlugOrId
-          ? { OR: [{ id: workspaceSlugOrId }, { slug: workspaceSlugOrId }] }
-          : { slug: 'northstar-studio' },
+      const workspace = await this.prisma.workspace.findFirst({
+        where: {
+          isSuspended: false,
+          ...(workspaceSlugOrId
+            ? {
+              OR: [{ id: workspaceSlugOrId }, { slug: workspaceSlugOrId }],
+              members: { some: { userId } },
+            }
+            : { members: { some: { userId } } }),
+        },
         include: {
           members: {
             include: { user: true },
@@ -21,19 +26,7 @@ export class DashboardService {
         },
       })
 
-      if (!workspace) {
-        workspace = await this.prisma.workspace.findFirst({
-          include: {
-            members: {
-              include: { user: true },
-            },
-          },
-        })
-      }
-
-      if (!workspace) {
-        return this.getFallbackSummary()
-      }
+      if (!workspace) throw new NotFoundException('Workspace not found')
 
       const workspaceId = workspace.id
 
@@ -163,11 +156,11 @@ export class DashboardService {
           projectName: task.projectName,
           projectTone: task.projectTone,
           completed: task.completed,
-          dueDate: task.dueDate || 'Nov 14',
-          priority: task.title.toLowerCase().includes('critical') || task.title.toLowerCase().includes('refresh') ? 'High' : 'Medium',
+          dueDate: task.dueDate || 'No due date',
+          priority: task.priority,
           assignee: {
-            name: task.assignedTo || 'Rohit Kumar',
-            initials: 'RK',
+            name: workspace.members.find((member) => member.userId === task.assignedTo)?.user.name || 'Unassigned',
+            initials: workspace.members.find((member) => member.userId === task.assignedTo)?.user.initials || '--',
           },
         })),
         activities: activities.map((act) => ({
@@ -196,9 +189,10 @@ export class DashboardService {
           synced: true,
         },
       }
-    } catch (err: any) {
-      this.logger.warn(`Database query note in getSummary: ${err.message}`)
-      return this.getFallbackSummary()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.logger.error(`Unable to load dashboard summary: ${message}`)
+      throw err
     }
   }
 

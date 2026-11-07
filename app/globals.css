@@ -59,6 +59,13 @@
 html {
   scroll-behavior: smooth;
   background: #ffffff;
+  font-size: 17px;
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 16px;
+  }
 }
 
 body {

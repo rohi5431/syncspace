@@ -142,11 +142,11 @@ export class DocumentsService {
   }
 
   async remove(id: string) {
-    await this.requireDocument(id)
+    const document = await this.requireDocument(id)
     await this.prisma.document.delete({ where: { id } })
     await this.redis.publish('syncspace:events', {
       type: 'document:deleted',
-      payload: { id },
+      payload: { id, workspaceId: document.workspaceId },
     })
     return { success: true, id }
   }
@@ -238,7 +238,7 @@ export class DocumentsService {
   }
 
   async createComment(documentId: string, dto: CreateCommentDto, user?: DocumentActor) {
-    await this.requireDocument(documentId)
+    const document = await this.requireDocument(documentId)
     const comment = await this.prisma.documentComment.create({
       data: {
         id: randomUUID(),
@@ -251,7 +251,7 @@ export class DocumentsService {
     })
     await this.redis.publish('syncspace:events', {
       type: 'document:comment-created',
-      payload: comment,
+      payload: { ...comment, workspaceId: document.workspaceId },
     })
     return comment
   }
@@ -305,7 +305,7 @@ export class DocumentsService {
   }
 
   async appendUpdate(documentId: string, dto: CreateDocumentUpdateDto) {
-    await this.requireDocument(documentId)
+    const document = await this.requireDocument(documentId)
     if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(dto.update)) {
       throw new BadRequestException('Update must be a valid base64-encoded Yjs update')
     }
@@ -318,7 +318,7 @@ export class DocumentsService {
     })
     await this.redis.publish('syncspace:events', {
       type: 'document:y-update',
-      payload: { documentId, update: dto.update },
+      payload: { documentId, update: dto.update, workspaceId: document.workspaceId },
     })
     return { id: stored.id, createdAt: stored.createdAt }
   }
@@ -326,7 +326,7 @@ export class DocumentsService {
   private async requireDocument(id: string) {
     const document = await this.prisma.document.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, workspaceId: true },
     })
     if (!document) throw new NotFoundException(`Document ${id} was not found`)
     return document

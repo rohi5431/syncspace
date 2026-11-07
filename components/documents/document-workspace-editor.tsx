@@ -7,9 +7,11 @@ import Collaboration from '@tiptap/extension-collaboration'
 import * as Y from 'yjs'
 import { io, type Socket } from 'socket.io-client'
 import type { DocumentSummary } from '@/components/dashboard/dashboard-types'
+import { apiFetch } from '@/lib/api-client'
 
 interface DocumentRecord extends DocumentSummary {
   content: string
+  workspaceId: string
 }
 
 interface DocumentComment {
@@ -66,22 +68,29 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
 
   useEffect(() => {
     let active = true
-    const socket = io(process.env.NEXT_PUBLIC_REALTIME_URL || 'http://localhost:3002')
+    let documentWorkspaceId: string | undefined
+    const socket = io(process.env.NEXT_PUBLIC_REALTIME_URL || 'http://localhost:3002', {
+      auth: { token: localStorage.getItem('syncspace_token') },
+    })
     socketRef.current = socket
+    const joinRooms = () => {
+      if (!documentWorkspaceId) return
+      socket.emit('join_workspace', { workspaceId: documentWorkspaceId })
+      socket.emit('join_document', { documentId: document.id, workspaceId: documentWorkspaceId })
+    }
     const onConnect = () => {
       setConnection('connected')
-      socket.emit('join_document', { documentId: document.id })
+      joinRooms()
     }
     const onDisconnect = () => setConnection('offline')
-    const onEvent = (event: { type?: string; payload?: { id?: string; documentId?: string; update?: string } }) => {
-      if (event.type === 'document:restored' && event.payload?.id === document.id) {
+    const onDocumentRestored = (event: { id?: string }) => {
+      if (event.id === document.id) {
         window.location.reload()
-        return
       }
-      if (event.type === 'document:y-update'
-        && event.payload?.documentId === document.id
-        && event.payload.update) {
-        Y.applyUpdate(ydoc, decodeBase64(event.payload.update), 'remote')
+    }
+    const onYUpdate = (event: { documentId?: string; update?: string }) => {
+      if (event.documentId === document.id && event.update) {
+        Y.applyUpdate(ydoc, decodeBase64(event.update), 'remote')
       }
     }
     const onDocumentChanged = (event: { documentId?: string; delta?: string }) => {
@@ -91,27 +100,30 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
     }
     socket.on('connect', onConnect)
     socket.on('disconnect', onDisconnect)
-    socket.on('server:event', onEvent)
+    socket.on('document:restored', onDocumentRestored)
+    socket.on('document:y-update', onYUpdate)
     socket.on('document:changed', onDocumentChanged)
 
     const initialize = async () => {
       try {
         const [documentResponse, updatesResponse] = await Promise.all([
-          fetch(`/api/documents/${encodeURIComponent(document.id)}`),
-          fetch(`/api/documents/${encodeURIComponent(document.id)}/updates`),
+          apiFetch(`/api/documents/${encodeURIComponent(document.id)}`),
+          apiFetch(`/api/documents/${encodeURIComponent(document.id)}/updates`),
         ])
         if (!documentResponse.ok) throw new Error(await documentResponse.text() || 'Unable to load document')
         if (!updatesResponse.ok) throw new Error(await updatesResponse.text() || 'Unable to load collaboration history')
         const loadedDocument: DocumentRecord = await documentResponse.json()
         const updates: string[] = await updatesResponse.json()
         if (!active) return
+        documentWorkspaceId = loadedDocument.workspaceId
+        joinRooms()
         for (const update of updates) Y.applyUpdate(ydoc, decodeBase64(update), 'remote')
         setRecord(loadedDocument)
         setText(loadedDocument.content)
         if (updates.length === 0 && loadedDocument.content && editor) {
           editor.commands.setContent(loadedDocument.content)
           const initialState = encodeBase64(Y.encodeStateAsUpdate(ydoc))
-          const response = await fetch(`/api/documents/${encodeURIComponent(document.id)}/updates`, {
+          const response = await apiFetch(`/api/documents/${encodeURIComponent(document.id)}/updates`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ update: initialState }),
@@ -126,10 +138,14 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
     void initialize()
     return () => {
       active = false
-      socket.emit('leave_document', { documentId: document.id })
+      if (documentWorkspaceId) {
+        socket.emit('leave_document', { documentId: document.id, workspaceId: documentWorkspaceId })
+        socket.emit('leave_workspace', { workspaceId: documentWorkspaceId })
+      }
       socket.off('connect', onConnect)
       socket.off('disconnect', onDisconnect)
-      socket.off('server:event', onEvent)
+      socket.off('document:restored', onDocumentRestored)
+      socket.off('document:y-update', onYUpdate)
       socket.off('document:changed', onDocumentChanged)
       socket.disconnect()
       socketRef.current = null
@@ -140,7 +156,7 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
     if (!ready || !editor || document.editor !== 'rich-text') return
     const persistUpdate = (update: Uint8Array, origin: unknown) => {
       if (origin === 'remote') return
-      void fetch(`/api/documents/${encodeURIComponent(document.id)}/updates`, {
+      void apiFetch(`/api/documents/${encodeURIComponent(document.id)}/updates`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ update: encodeBase64(update) }),
@@ -148,6 +164,7 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
         if (!response.ok) throw new Error('Collaboration update could not be saved')
         socketRef.current?.emit('doc_change', {
           documentId: document.id,
+          workspaceId: record?.workspaceId,
           delta: encodeBase64(update),
         })
       }).catch((saveError: unknown) => {
@@ -160,7 +177,7 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
       window.clearTimeout(saveTimer)
       saveTimer = window.setTimeout(() => {
         const content = editor.getHTML()
-        void fetch(`/api/documents/${encodeURIComponent(document.id)}`, {
+        void apiFetch(`/api/documents/${encodeURIComponent(document.id)}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content }),
@@ -178,12 +195,12 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
       editor.off('update', saveContent)
       window.clearTimeout(saveTimer)
     }
-  }, [document.editor, document.id, editor, ready, ydoc])
+  }, [document.editor, document.id, editor, ready, record?.workspaceId, ydoc])
 
   useEffect(() => {
     if (!ready || document.editor === 'rich-text') return
     const timer = window.setTimeout(() => {
-      void fetch(`/api/documents/${encodeURIComponent(document.id)}`, {
+      void apiFetch(`/api/documents/${encodeURIComponent(document.id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: text }),
@@ -199,9 +216,9 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
   useEffect(() => {
     if (!ready) return
     void Promise.all([
-      fetch(`/api/documents/${encodeURIComponent(document.id)}/comments`).then((response) => response.ok ? response.json() : []),
-      fetch(`/api/documents/${encodeURIComponent(document.id)}/versions`).then((response) => response.ok ? response.json() : []),
-      fetch(`/api/documents/${encodeURIComponent(document.id)}/files`).then((response) => response.ok ? response.json() : { files: [] }),
+      apiFetch(`/api/documents/${encodeURIComponent(document.id)}/comments`).then((response) => response.ok ? response.json() : []),
+      apiFetch(`/api/documents/${encodeURIComponent(document.id)}/versions`).then((response) => response.ok ? response.json() : []),
+      apiFetch(`/api/documents/${encodeURIComponent(document.id)}/files`).then((response) => response.ok ? response.json() : { files: [] }),
     ]).then(([loadedComments, loadedVersions, loadedFiles]) => {
       setComments(loadedComments)
       setVersions(loadedVersions)
@@ -214,7 +231,7 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
   const addComment = async () => {
     if (!comment.trim()) return
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(document.id)}/comments`, {
+      const response = await apiFetch(`/api/documents/${encodeURIComponent(document.id)}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: comment.trim() }),
@@ -230,7 +247,7 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
 
   const restoreVersion = async (versionId: string) => {
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(document.id)}/versions/${encodeURIComponent(versionId)}/restore`, { method: 'POST' })
+      const response = await apiFetch(`/api/documents/${encodeURIComponent(document.id)}/versions/${encodeURIComponent(versionId)}/restore`, { method: 'POST' })
       if (!response.ok) throw new Error(await response.text() || 'Unable to restore version')
       const updated: DocumentRecord = await response.json()
       setRecord(updated)
@@ -242,12 +259,27 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
     }
   }
 
+  const downloadFile = async (file: DocumentFile) => {
+    try {
+      const response = await apiFetch(file.downloadUrl)
+      if (!response.ok) throw new Error(await response.text() || 'Unable to download attachment')
+      const url = URL.createObjectURL(await response.blob())
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = file.filename
+      link.click()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (downloadError) {
+      setError(downloadError instanceof Error ? downloadError.message : 'Unable to download attachment')
+    }
+  }
+
   const uploadFile = async (file?: File) => {
     if (!file) return
     const formData = new FormData()
     formData.set('file', file)
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(document.id)}/files/upload`, {
+      const response = await apiFetch(`/api/documents/${encodeURIComponent(document.id)}/files/upload`, {
         method: 'POST',
         body: formData,
       })
@@ -326,9 +358,9 @@ export function DocumentWorkspaceEditor({ document }: { document: DocumentSummar
           </div>
           <div className="mt-2 space-y-2">
             {files.map((file) => (
-              <a key={file.fileId} href={file.downloadUrl} target="_blank" rel="noreferrer" className="block truncate rounded-lg border border-gray-100 p-2 text-xs text-indigo-600">
+              <button key={file.fileId} type="button" onClick={() => void downloadFile(file)} className="block w-full truncate rounded-lg border border-gray-100 p-2 text-left text-xs text-indigo-600">
                 {file.filename} · {Math.ceil(file.size / 1024)} KB
-              </a>
+              </button>
             ))}
           </div>
         </section>

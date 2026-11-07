@@ -15,6 +15,10 @@ model User {
   initials     String
   tone         String            @default("indigo")
   role         String            @default("MEMBER")
+  platformRole String            @default("USER")
+  isSuspended  Boolean           @default(false)
+  emailVerifiedAt DateTime?
+  lastLoginAt  DateTime?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   memberships  WorkspaceMember[]
@@ -32,6 +36,7 @@ model Workspace {
   ownerId     String
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+  isSuspended Boolean           @default(false)
   members     WorkspaceMember[]
   documents   Document[]
   projects    Project[]
@@ -239,7 +244,7 @@ model Activity {
 model RefreshToken {
   id          String    @id @default(uuid())
   userId      String
-  tokenHash   String
+  tokenHash   String    @unique
   expiresAt   DateTime
   revoked     Boolean   @default(false)
   createdAt   DateTime  @default(now())
@@ -248,4 +253,24 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model AdminAuditLog {
+  id          String   @id @default(uuid())
+  actorId     String?
+  actorEmail  String?
+  action      String
+  resourceType String
+  resourceId  String?
+  requestId   String?
+  ipAddress   String?
+  success     Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([resourceType, resourceId, createdAt])
+  @@map("admin_audit_logs")
 }

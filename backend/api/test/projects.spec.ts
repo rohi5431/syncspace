@@ -19,6 +19,9 @@ describe('ProjectsService', () => {
         createMany: jest.fn().mockResolvedValue({ count: 7 }),
       },
       $transaction: jest.fn(async (callback: (transaction: any) => unknown) => callback(mockPrisma)),
+      workspaceMember: {
+        findFirst: jest.fn().mockResolvedValue({ workspace: { id: 'ws-1' } }),
+      },
       workspace: {
         findFirst: jest.fn().mockResolvedValue({ id: 'ws-1' }),
       },
@@ -31,8 +34,11 @@ describe('ProjectsService', () => {
   })
 
   it('returns persisted projects without fabricated fallback rows', async () => {
-    const projects = await projectsService.findAll()
+    const projects = await projectsService.findAll('usr-1')
     expect(projects).toEqual([])
+    expect(mockPrisma.project.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { workspaceId: undefined, workspace: { members: { some: { userId: 'usr-1' } } } },
+    }))
   })
 
   it('creates project sections transactionally and publishes event', async () => {
@@ -66,7 +72,7 @@ describe('ProjectsService', () => {
       description: 'Shared UI components',
       dueDate: 'Due Dec 1',
       members: ['MC'],
-    })
+    }, 'usr-1')
 
     expect(project.title).toBe('Design System')
     const sectionData = mockPrisma.projectSection.createMany.mock.calls[0][0].data

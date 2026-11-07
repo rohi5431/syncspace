@@ -1,5 +1,6 @@
 import { AuthService } from '../src/auth/auth.service'
 import { JwtService } from '@nestjs/jwt'
+import * as bcrypt from 'bcryptjs'
 
 describe('AuthService', () => {
   let authService: AuthService
@@ -12,9 +13,17 @@ describe('AuthService', () => {
       user: {
         findUnique: jest.fn(),
         create: jest.fn(),
+        update: jest.fn().mockResolvedValue({}),
       },
       workspace: {
         create: jest.fn(),
+      },
+      refreshToken: {
+        create: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      adminAuditLog: {
+        create: jest.fn().mockResolvedValue({}),
       },
     }
     authService = new AuthService(mockPrisma as any, jwtService)
@@ -48,7 +57,7 @@ describe('AuthService', () => {
     expect(result.refreshToken).toBeDefined()
   })
 
-  it('provides profile fallback for testing', async () => {
+  it('returns the persisted user profile', async () => {
     mockPrisma.user.findUnique.mockResolvedValue({
       id: 'usr-1',
       email: 'alex@northstar.co',
@@ -61,5 +70,56 @@ describe('AuthService', () => {
     const profile = await authService.getProfile('usr-1')
     expect(profile).toBeDefined()
     expect(profile?.email).toBe('alex@northstar.co')
+  })
+
+  it('authenticates the seeded workspace administrator with the demo password', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: 'usr-maya',
+      email: 'maya@northstar.co',
+      name: 'Maya Chen',
+      initials: 'MC',
+      tone: 'indigo',
+      role: 'ADMIN',
+      platformRole: 'ADMIN',
+      passwordHash: await bcrypt.hash('syncspace123', 10),
+      isSuspended: false,
+      memberships: [{
+        role: 'ADMIN',
+        workspace: { id: 'ws-northstar', name: 'Northstar Studio', slug: 'northstar-studio' },
+      }],
+    })
+
+    const result = await authService.login({
+      email: 'maya@northstar.co',
+      password: 'syncspace123',
+    })
+
+    expect(result.user.role).toBe('ADMIN')
+    expect(result.user.platformRole).toBe('ADMIN')
+    expect(result.workspace?.slug).toBe('northstar-studio')
+    expect(result.accessToken).toBeDefined()
+  })
+
+  it('does not issue a fake session when the database is unavailable', async () => {
+    mockPrisma.user.findUnique.mockRejectedValue(new Error('database unavailable'))
+
+    await expect(authService.login({
+      email: 'maya@northstar.co',
+      password: 'syncspace123',
+    })).rejects.toThrow('database unavailable')
+  })
+
+  it('rejects suspended accounts during login', async () => {
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: 'usr-suspended',
+      email: 'suspended@northstar.co',
+      passwordHash: await bcrypt.hash('password123', 10),
+      isSuspended: true,
+    })
+
+    await expect(authService.login({
+      email: 'suspended@northstar.co',
+      password: 'password123',
+    })).rejects.toThrow('This account has been suspended.')
   })
 })

@@ -4,6 +4,7 @@ import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { RefreshDto } from './dto/refresh.dto'
 import { JwtAuthGuard } from './jwt-auth.guard'
+import { AuthenticatedRequest } from './authenticated-request'
 
 @Controller('api/auth')
 export class AuthController {
@@ -32,7 +33,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  logout() {
-    return { success: true, message: 'Logged out successfully.' }
+  logout(@Request() req: AuthenticatedRequest) {
+    return this.authService.logout(req.user.id, req.user.sessionId)
   }
 }

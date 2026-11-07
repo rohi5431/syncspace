@@ -3,7 +3,8 @@
 FROM node:22-alpine AS deps
 RUN corepack enable
 WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml* ./
+RUN if [ -f pnpm-workspace.yaml.bak ]; then mv pnpm-workspace.yaml.bak pnpm-workspace.yaml; fi
 RUN pnpm install --frozen-lockfile
 FROM node:22-alpine AS build
 RUN corepack enable

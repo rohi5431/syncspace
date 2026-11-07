@@ -1,10 +1,13 @@
 import { Module } from '@nestjs/common'
 import { ActivityService } from './activity.service'
 import { ActivityController } from './activity.controller'
+import { AuthModule } from '../auth/auth.module'
+import { WorkspaceMembershipGuard } from '../auth/workspace-membership.guard'
 
 @Module({
+  imports: [AuthModule],
   controllers: [ActivityController],
-  providers: [ActivityService],
+  providers: [ActivityService, WorkspaceMembershipGuard],
   exports: [ActivityService],
 })
 export class ActivityModule {}

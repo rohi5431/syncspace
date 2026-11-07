@@ -1,12 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing'
+import { NotFoundException } from '@nestjs/common'
 import { DashboardService } from '../src/dashboard/dashboard.service'
 import { PrismaService } from '../src/prisma/prisma.service'
 
 describe('DashboardService', () => {
   let service: DashboardService
+  let prisma: PrismaService
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    const testingModule: TestingModule = await Test.createTestingModule({
       providers: [
         DashboardService,
         {
@@ -21,15 +23,19 @@ describe('DashboardService', () => {
       ],
     }).compile()
 
-    service = module.get<DashboardService>(DashboardService)
+    service = testingModule.get<DashboardService>(DashboardService)
+    prisma = testingModule.get<PrismaService>(PrismaService)
   })
 
-  it('should return complete workspace summary', async () => {
-    const summary = await service.getSummary('northstar-studio')
-    expect(summary).toBeDefined()
-    expect(summary.workspace.name).toBe('Northstar Studio')
-    expect(summary.stats.documents.total).toBeGreaterThanOrEqual(0)
-    expect(summary.stats.projects.total).toBeGreaterThanOrEqual(0)
-    expect(summary.teamMembers.length).toBeGreaterThan(0)
+  it('does not fall back to another tenant when the requested workspace is not a member of the caller', async () => {
+    const workspaceFindFirst = jest.spyOn(prisma.workspace, 'findFirst')
+
+    await expect(service.getSummary('user-1', 'private-workspace')).rejects.toBeInstanceOf(NotFoundException)
+    expect(workspaceFindFirst).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        OR: [{ id: 'private-workspace' }, { slug: 'private-workspace' }],
+        members: { some: { userId: 'user-1' } },
+      }),
+    }))
   })
 })

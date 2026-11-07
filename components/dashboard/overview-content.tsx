@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/providers/toast-provider'
 import { UserAvatar } from '@/components/dashboard/user-avatar'
+import { apiFetch } from '@/lib/api-client'
 import {
   CreateDocumentDialog,
   CreateProjectDialog,
@@ -142,7 +143,7 @@ export function DashboardOverviewContent() {
     }
 
     // Try fetching summary from backend API
-    fetch('/api/dashboard/summary')
+    apiFetch('/api/dashboard/summary')
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.recentDocuments?.length) {

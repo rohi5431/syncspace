@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/providers/toast-provider'
+import { apiFetch } from '@/lib/api-client'
 import { CreateProjectDialog } from '@/components/dashboard/create-dialogs'
 import type { ProjectSummary } from '@/components/dashboard/dashboard-types'
 
@@ -33,7 +34,7 @@ export function ProjectsManager() {
 
   useEffect(() => {
     let active = true
-    fetch('/api/projects')
+    apiFetch('/api/projects')
       .then(async (response) => {
         if (!response.ok) throw new Error(await response.text() || 'Unable to load projects')
         return response.json()
@@ -79,7 +80,7 @@ export function ProjectsManager() {
 
   const handleDelete = async (id: string, title: string) => {
     try {
-      const response = await fetch(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' })
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(id)}`, { method: 'DELETE' })
       if (!response.ok) throw new Error(await response.text() || 'Unable to delete project')
       setProjects((prev) => prev.filter((project) => project.id !== id))
       toast(`Deleted “${title}”.`)

@@ -7,6 +7,7 @@ export class StorageService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(StorageService.name)
   private connection: Connection | null = null
   private bucket: InstanceType<typeof mongoose.mongo.GridFSBucket> | null = null
+  private lastSuccessfulHealthCheck: Date | null = null
 
   async onModuleInit() {
     const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/syncspace'
@@ -16,6 +17,7 @@ export class StorageService implements OnModuleInit, OnModuleDestroy {
       this.bucket = new mongoose.mongo.GridFSBucket(this.connection.db!, {
         bucketName: 'documents',
       })
+      this.lastSuccessfulHealthCheck = new Date()
       this.logger.log('MongoDB GridFS connected for document storage')
     } catch (err: any) {
       this.logger.warn(`MongoDB GridFS unavailable: ${err.message}`)
@@ -30,6 +32,62 @@ export class StorageService implements OnModuleInit, OnModuleDestroy {
 
   isAvailable(): boolean {
     return this.bucket !== null
+  }
+
+  async getAdminStorageSnapshot() {
+    if (!this.connection?.db || !this.bucket) {
+      return {
+        status: process.env.MONGODB_URI ? 'unavailable' as const : 'unknown' as const,
+        totalBytes: null,
+        fileCount: null,
+        lastSuccessfulHealthCheck: this.lastSuccessfulHealthCheck?.toISOString() ?? null,
+      }
+    }
+    try {
+      const result = await this.connection.db.collection('documents.files').aggregate<{
+        totalBytes: number
+        fileCount: number
+      }>([
+        { $group: { _id: null, totalBytes: { $sum: '$length' }, fileCount: { $sum: 1 } } },
+      ]).toArray()
+      this.lastSuccessfulHealthCheck = new Date()
+      return {
+        status: 'healthy' as const,
+        totalBytes: result[0]?.totalBytes ?? 0,
+        fileCount: result[0]?.fileCount ?? 0,
+        lastSuccessfulHealthCheck: this.lastSuccessfulHealthCheck.toISOString(),
+      }
+    } catch (error) {
+      this.logger.warn(`Could not read GridFS storage statistics: ${error instanceof Error ? error.message : String(error)}`)
+      return {
+        status: 'degraded' as const,
+        totalBytes: null,
+        fileCount: null,
+        lastSuccessfulHealthCheck: this.lastSuccessfulHealthCheck?.toISOString() ?? null,
+      }
+    }
+  }
+
+  async getWorkspaceStorageSnapshot(documentIds: string[]) {
+    if (!this.bucket) {
+      return {
+        status: process.env.MONGODB_URI ? 'unavailable' as const : 'unknown' as const,
+        totalBytes: null,
+        fileCount: null,
+      }
+    }
+    if (documentIds.length === 0) return { status: 'healthy' as const, totalBytes: 0, fileCount: 0 }
+    try {
+      const files = await this.bucket.find({ 'metadata.documentId': { $in: documentIds } }).toArray()
+      return {
+        status: 'healthy' as const,
+        totalBytes: files.reduce((total, file) => total + file.length, 0),
+        fileCount: files.length,
+      }
+    } catch (error) {
+      this.logger.warn(`Could not read workspace GridFS usage: ${error instanceof Error ? error.message : String(error)}`)
+      return { status: 'degraded' as const, totalBytes: null, fileCount: null }
+    }
   }
 
   /**

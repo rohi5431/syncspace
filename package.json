@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:all": "npx --yes concurrently --kill-others-on-fail -n \"frontend,api,realtime,worker\" -c \"cyan.bold,green.bold,magenta.bold,yellow.bold\" \"npm run dev\" \"npm run start:dev --prefix backend/api\" \"npm run start:dev --prefix backend/realtime\" \"npm run start:dev --prefix backend/worker\"",
+    "lint": "eslint .",
     "build": "next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -39,6 +40,8 @@
     "@types/node": "^24",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^10.14.0",
+    "eslint-config-next": "16.4.3",
     "postcss": "^8.5",
     "tailwindcss": "^4.3.3",
     "typescript": "5.7.3"

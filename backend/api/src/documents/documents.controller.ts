@@ -1,5 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Request } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Request, UseGuards } from '@nestjs/common'
 import { DocumentsService } from './documents.service'
+import { JwtAuthGuard } from '../auth/jwt-auth.guard'
+import { WorkspaceMembershipGuard } from '../auth/workspace-membership.guard'
 import {
   CreateCommentDto,
   CreateDocumentDto,
@@ -10,6 +12,7 @@ import {
   UpdateDocumentDto,
 } from './dto/document.dto'
 
+@UseGuards(JwtAuthGuard, WorkspaceMembershipGuard)
 @Controller('api/documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}

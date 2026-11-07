@@ -12,6 +12,7 @@ import { TasksModule } from './tasks/tasks.module'
 import { ActivityModule } from './activity/activity.module'
 import { DashboardModule } from './dashboard/dashboard.module'
 import { StorageModule } from './storage/storage.module'
+import { AdminModule } from './admin/admin.module'
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { StorageModule } from './storage/storage.module'
     ActivityModule,
     DashboardModule,
     StorageModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

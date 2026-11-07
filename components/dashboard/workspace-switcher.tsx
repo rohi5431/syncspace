@@ -12,10 +12,11 @@ export function WorkspaceSwitcher() {
   const [workspaces, setWorkspaces] = useState(['Northstar Studio', 'Acme Design Co.'])
   const toast = useToast()
 
-  const createWorkspace = (name: string) => {
-    setWorkspaces((current) => [...current, name])
-    setWorkspace(name)
-    toast(`Workspace “${name}” created.`)
+  const createWorkspace = (created: { id: string; name: string; slug: string }) => {
+    setWorkspaces((current) => [...current, created.name])
+    setWorkspace(created.name)
+    localStorage.setItem('syncspace_workspace', JSON.stringify(created))
+    toast(`Workspace “${created.name}” created.`)
   }
 
   return (

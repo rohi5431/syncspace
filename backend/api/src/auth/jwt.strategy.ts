@@ -13,9 +13,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     })
   }
 
-  async validate(payload: { sub: string; email: string }) {
-    try {
-      const user = await this.prisma.user.findUnique({
+  async validate(payload: { sub: string; email: string; sid?: string }) {
+    const [user, session] = await Promise.all([
+      this.prisma.user.findUnique({
         where: { id: payload.sub },
         select: {
           id: true,
@@ -24,22 +24,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           initials: true,
           tone: true,
           role: true,
+          platformRole: true,
+          isSuspended: true,
         },
-      })
-      if (!user) {
-        throw new UnauthorizedException('User no longer exists')
-      }
-      return user
-    } catch {
-      // Fallback for mocked or offline DB state in testing
-      return {
-        id: payload.sub,
-        email: payload.email,
-        name: payload.email.split('@')[0],
-        initials: payload.email.slice(0, 2).toUpperCase(),
-        tone: 'indigo',
-        role: 'MEMBER',
-      }
-    }
+      }),
+      payload.sid
+        ? this.prisma.refreshToken.findFirst({
+            where: {
+              id: payload.sid,
+              userId: payload.sub,
+              revoked: false,
+              expiresAt: { gt: new Date() },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ])
+    if (!user) throw new UnauthorizedException('User no longer exists')
+    if (user.isSuspended) throw new UnauthorizedException('This account has been suspended.')
+    if (!session) throw new UnauthorizedException('Session has been revoked')
+    return { ...user, sessionId: session?.id }
   }
 }

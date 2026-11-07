@@ -4,7 +4,11 @@ import { useEffect, useState } from 'react'
 import { Check, Copy, Globe, Link2, Lock, Mail, Plus, Sparkles, UserPlus, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Modal } from '@/components/ui/modal'
-import type { DocumentSummary, ProjectSummary, TaskSummary } from './dashboard-types'
+import type { DocumentSummary, ProjectSummary, TaskSummary, TeamMemberSummary } from './dashboard-types'
+import { apiFetch } from '@/lib/api-client'
+
+const EMPTY_PROJECTS: ProjectSummary[] = []
+const EMPTY_TEAM_MEMBERS: TeamMemberSummary[] = []
 
 // 1. CREATE DOCUMENT DIALOG
 export function CreateDocumentDialog({
@@ -36,10 +40,19 @@ export function CreateDocumentDialog({
     setSaving(true)
     setError('')
     try {
-      const response = await fetch('/api/documents', {
+      let targetWorkspaceId = workspaceId
+      if (!targetWorkspaceId) {
+        const storedWorkspace = localStorage.getItem('syncspace_workspace')
+        if (!storedWorkspace) throw new Error('Select a workspace before creating a document')
+        const activeWorkspace = JSON.parse(storedWorkspace) as { id?: string }
+        if (!activeWorkspace.id) throw new Error('The active workspace is invalid')
+        targetWorkspaceId = activeWorkspace.id
+      }
+
+      const response = await apiFetch('/api/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: value, category, type, editor, workspaceId, folderId, projectId }),
+        body: JSON.stringify({ title: value, category, type, editor, workspaceId: targetWorkspaceId, folderId, projectId }),
       })
       if (!response.ok) throw new Error(await response.text() || 'Unable to create document')
       const document = await response.json()
@@ -157,10 +170,12 @@ export function CreateProjectDialog({
   open,
   onClose,
   onCreate,
+  workspaceId,
 }: {
   open: boolean
   onClose: () => void
   onCreate: (project: ProjectSummary) => void
+  workspaceId?: string
 }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -177,7 +192,7 @@ export function CreateProjectDialog({
     setSaving(true)
     setError('')
     try {
-      const response = await fetch('/api/projects', {
+      const response = await apiFetch('/api/projects', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -186,6 +201,7 @@ export function CreateProjectDialog({
           dueDate: dueDate || 'No due date',
           tone,
           template,
+          ...(workspaceId ? { workspaceId } : {}),
         }),
       })
       if (!response.ok) throw new Error(await response.text() || 'Unable to create project')
@@ -312,18 +328,50 @@ export function CreateTaskDialog({
   onClose,
   onCreate,
   projectId,
+  projects = EMPTY_PROJECTS,
+  teamMembers = EMPTY_TEAM_MEMBERS,
 }: {
   open: boolean
   onClose: () => void
   onCreate: (task: TaskSummary) => void
   projectId?: string
+  projects?: ProjectSummary[]
+  teamMembers?: TeamMemberSummary[]
 }) {
+  const [availableProjects, setAvailableProjects] = useState(projects)
+  const [availableMembers, setAvailableMembers] = useState(teamMembers)
   const [title, setTitle] = useState('')
-  const [projectName, setProjectName] = useState('Website refresh')
+  const [selectedProjectId, setSelectedProjectId] = useState(projectId ?? '')
+  const [assignedTo, setAssignedTo] = useState('')
   const [priority, setPriority] = useState<'High' | 'Medium' | 'Low'>('Medium')
   const [dueDate, setDueDate] = useState('Nov 18')
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setAvailableProjects(projects)
+    setAvailableMembers(teamMembers)
+    if (projects.length > 0 && teamMembers.length > 0) return
+
+    if (open) {
+      apiFetch('/api/dashboard/summary')
+        .then(async (response) => {
+          if (!response.ok) throw new Error(await response.text() || 'Unable to load workspace members')
+          return response.json()
+        })
+        .then((summary: { projects?: ProjectSummary[]; teamMembers?: TeamMemberSummary[] }) => {
+          if (projects.length === 0) setAvailableProjects(summary.projects ?? [])
+          if (teamMembers.length === 0) setAvailableMembers(summary.teamMembers ?? [])
+        })
+        .catch((loadError: unknown) => {
+          setError(loadError instanceof Error ? loadError.message : 'Unable to load workspace members')
+        })
+    }
+  }, [open, projects, teamMembers])
+
+  useEffect(() => {
+    setSelectedProjectId(projectId ?? availableProjects[0]?.id ?? '')
+  }, [projectId, availableProjects])
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -332,30 +380,35 @@ export function CreateTaskDialog({
     setSaving(true)
     setError('')
     try {
-      let id = `task-${Date.now()}`
-      let assignee = { name: 'Rohit Kumar', initials: 'RK' }
-      if (projectId) {
-        const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/tasks`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: val, dueDate, priority: priority.toUpperCase() }),
-        })
-        if (!response.ok) throw new Error(await response.text() || 'Unable to create task')
-        const createdTask = await response.json()
-        id = createdTask.id
-        assignee = { name: createdTask.assignedTo ?? 'Unassigned', initials: createdTask.assignedTo ?? '--' }
-      }
+      if (!selectedProjectId) throw new Error('Choose a project before creating the task')
+      const response = await apiFetch(`/api/projects/${encodeURIComponent(selectedProjectId)}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: val,
+          dueDate,
+          priority: priority.toUpperCase(),
+          ...(assignedTo ? { assignedTo } : {}),
+        }),
+      })
+      if (!response.ok) throw new Error(await response.text() || 'Unable to create task')
+      const createdTask = await response.json()
+      const selectedMember = availableMembers.find((member) => member.id === assignedTo)
+      const selectedProject = availableProjects.find((project) => project.id === selectedProjectId)
       onCreate({
-        id,
+        id: createdTask.id,
         title: val,
-        projectName,
-        projectTone: 'indigo',
+        projectName: selectedProject?.title ?? 'Project',
+        projectTone: selectedProject?.tone ?? 'indigo',
         completed: false,
-        dueDate: dueDate || 'Nov 18',
+        dueDate: createdTask.dueDate ?? 'No due date',
         priority,
-        assignee,
+        assignee: selectedMember
+          ? { name: selectedMember.name, initials: selectedMember.initials }
+          : { name: 'Unassigned', initials: '--' },
       })
       setTitle('')
+      setAssignedTo('')
       onClose()
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Unable to create task')
@@ -385,14 +438,13 @@ export function CreateTaskDialog({
             <label htmlFor="task-proj" className="mb-1.5 block text-sm font-semibold text-gray-700">Project</label>
             <select
               id="task-proj"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              disabled={Boolean(projectId)}
               className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-[#6C4CF1] focus:ring-3 focus:ring-[#6C4CF1]/15"
             >
-              <option>Website refresh</option>
-              <option>Mobile app v2</option>
-              <option>Brand redesign</option>
-              <option>Realtime Infrastructure</option>
+              <option value="">Select a project</option>
+              {availableProjects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}
             </select>
           </div>
           <div>
@@ -408,6 +460,19 @@ export function CreateTaskDialog({
               <option value="Low">🌱 Low Priority</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="task-assignee" className="mb-1.5 block text-sm font-semibold text-gray-700">Assign to team member</label>
+          <select
+            id="task-assignee"
+            value={assignedTo}
+            onChange={(event) => setAssignedTo(event.target.value)}
+            className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-[#6C4CF1] focus:ring-3 focus:ring-[#6C4CF1]/15"
+          >
+            <option value="">Unassigned</option>
+            {availableMembers.map((member) => <option key={member.id} value={member.id}>{member.name} ({member.role})</option>)}
+          </select>
         </div>
 
         <div>
@@ -441,17 +506,34 @@ export function CreateWorkspaceDialog({
 }: {
   open: boolean
   onClose: () => void
-  onCreate: (name: string) => void
+  onCreate: (workspace: { id: string; name: string; slug: string }) => void
 }) {
   const [name, setName] = useState('')
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const val = name.trim()
-    if (!val) return
-    onCreate(val)
-    setName('')
-    onClose()
+    if (!val || saving) return
+    setSaving(true)
+    setError('')
+    try {
+      const response = await apiFetch('/api/workspaces', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: val }),
+      })
+      if (!response.ok) throw new Error(await response.text() || 'Unable to create workspace')
+      const workspace = await response.json()
+      onCreate(workspace)
+      setName('')
+      onClose()
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Unable to create workspace')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -481,8 +563,9 @@ export function CreateWorkspaceDialog({
 
         <div className="mt-4 flex justify-end gap-3 border-t border-gray-100 pt-4">
           <Button type="button" variant="outline" onClick={onClose} className="rounded-xl px-4 py-2 font-medium">Cancel</Button>
-          <Button type="submit" className="rounded-xl bg-[#6C4CF1] px-5 py-2 font-semibold text-white shadow-sm hover:bg-[#5738D6]">
-            Create Workspace
+          {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
+          <Button type="submit" disabled={saving} className="rounded-xl bg-[#6C4CF1] px-5 py-2 font-semibold text-white shadow-sm hover:bg-[#5738D6]">
+            {saving ? 'Creating…' : 'Create Workspace'}
           </Button>
         </div>
       </form>
@@ -577,7 +660,7 @@ export function ShareDocumentDialog({
 
   const loadPermissions = async () => {
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}/permissions`)
+      const response = await apiFetch(`/api/documents/${encodeURIComponent(documentId)}/permissions`)
       if (!response.ok) throw new Error(await response.text() || 'Unable to load permissions')
       setPermissions(await response.json())
     } catch (loadError) {
@@ -595,7 +678,7 @@ export function ShareDocumentDialog({
     setSaving(true)
     setError('')
     try {
-      const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}/permissions`, {
+      const response = await apiFetch(`/api/documents/${encodeURIComponent(documentId)}/permissions`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), role }),
@@ -616,7 +699,7 @@ export function ShareDocumentDialog({
 
   const removePermission = async (address: string) => {
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/documents/${encodeURIComponent(documentId)}/permissions?email=${encodeURIComponent(address)}`,
         { method: 'DELETE' },
       )

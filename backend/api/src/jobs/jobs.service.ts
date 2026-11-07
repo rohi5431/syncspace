@@ -53,6 +53,29 @@ export class JobsService implements OnModuleDestroy {
     }
   }
 
+  async getQueueSnapshot() {
+    if (!this.queue) return { status: 'unavailable' as const }
+    try {
+      const [counts, isPaused] = await Promise.all([
+        this.queue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed', 'paused'),
+        this.queue.isPaused(),
+      ])
+      return {
+        status: 'healthy' as const,
+        paused: isPaused,
+        waiting: counts.waiting ?? 0,
+        active: counts.active ?? 0,
+        completed: counts.completed ?? 0,
+        failed: counts.failed ?? 0,
+        delayed: counts.delayed ?? 0,
+        pausedJobs: counts.paused ?? 0,
+      }
+    } catch (error) {
+      this.logger.warn(`Could not read BullMQ queue status: ${error instanceof Error ? error.message : String(error)}`)
+      return { status: 'unavailable' as const }
+    }
+  }
+
   async onModuleDestroy() {
     if (this.queue) {
       await this.queue.close()

@@ -25,11 +25,12 @@ export function WorkspaceSwitcher({
     toast(`Switched active workspace to: ${name}`)
   }
 
-  const handleCreate = (name: string) => {
-    setWorkspaces((prev) => [...prev, name])
-    setWorkspace(name)
-    onWorkspaceChange?.(name)
-    toast(`Workspace “${name}” created and activated.`)
+  const handleCreate = (created: { id: string; name: string; slug: string }) => {
+    setWorkspaces((prev) => [...prev, created.name])
+    setWorkspace(created.name)
+    onWorkspaceChange?.(created.name)
+    localStorage.setItem('syncspace_workspace', JSON.stringify(created))
+    toast(`Workspace “${created.name}” created and activated.`)
   }
 
   return (
